@@ -1,0 +1,1953 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventarios — Microsip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F6F7; --card:#FFFFFF; --ink:#2B2F2C; --ink-soft:#6B6B6B;
+    --green:#2F6844; --green-deep:#1B4332; --green-pale:#EAF4EE;
+    --orange:#F2994A; --orange-deep:#D9782B; --orange-pale:#FDF0E3;
+    --tomato:#B23A2E; --tomato-pale:#FCEAE5;
+    --line:#D9D9D9; --line-soft:#EDEDED;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter', sans-serif; font-size:13.5px; line-height:1.5; min-height:100vh;}
+  h1,h2,h3{font-family:'Inter', sans-serif; font-weight:700; margin:0 0 4px 0; color:var(--green-deep);}
+  h2{font-size:16px;} h3{font-size:14px;}
+  .shell{display:flex; min-height:100vh; align-items:stretch;}
+  .sidebar{width:180px; flex:none; background:var(--green-deep); padding:16px 12px; display:flex; flex-direction:column; gap:2px;}
+  .sidebar .brand{display:flex; align-items:center; gap:9px; margin-bottom:16px; padding:0 8px;}
+  .sidebar .brand .logo{width:26px; height:26px; flex:none;}
+  .sidebar .brand span{font-family:'Inter', sans-serif; font-weight:700; font-size:14px; color:#fff;}
+  .main{flex:1; min-width:0;}
+  .app{max-width:920px; margin:0 auto; padding:20px 24px 60px;}
+  .breadcrumb{font-size:11.5px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px; font-weight:600;}
+  .breadcrumb .sep{margin:0 5px; color:var(--line);}
+  .breadcrumb .current{color:var(--green-deep);}
+  .procTabs{display:flex; flex-direction:column; gap:2px;}
+  .procTabs button{
+    all:unset; cursor:pointer; font-family:'Inter', sans-serif; font-size:12.5px; font-weight:600;
+    padding:9px 11px; border-radius:0 3px 3px 0; border-left:3px solid transparent; color:#B9D2C1;
+  }
+  .procTabs button.active{background:rgba(255,255,255,0.14); border-left-color:var(--orange); color:#fff;}
+  .procTabs button.locked{opacity:0.45; cursor:not-allowed;}
+  @media (max-width:780px){
+    .shell{flex-direction:column;}
+    .sidebar{width:100%; flex-direction:row; align-items:center; padding:10px 14px; overflow-x:auto;}
+    .sidebar .brand{margin-bottom:0; margin-right:6px;}
+    .procTabs{flex-direction:row;}
+    .procTabs button{border-left:none; border-bottom:3px solid transparent; border-radius:3px 3px 0 0; white-space:nowrap;}
+    .procTabs button.active{border-left-color:transparent; border-bottom-color:var(--orange);}
+  }
+  .layout{display:grid; grid-template-columns:150px 1fr; gap:18px;}
+  @media (max-width:680px){.layout{grid-template-columns:1fr;} .rail{display:flex; flex-direction:row; gap:8px; overflow-x:auto;}}
+  .rail{display:flex; flex-direction:column; gap:2px;}
+  .rail button{all:unset; cursor:pointer; display:flex; align-items:center; gap:9px; padding:9px 9px; font-family:'Inter', sans-serif; font-size:12.5px; font-weight:600; color:var(--ink-soft); border-left:3px solid var(--line); white-space:nowrap; border-radius:0 3px 3px 0;}
+  .rail button .num{font-family:'Inter', sans-serif; font-weight:700; font-size:13px; width:18px; color:inherit;}
+  .rail button.active{color:var(--green-deep); background:var(--green-pale); border-left:3px solid var(--orange);}
+  .rail button.done{color:var(--green);}
+  .rail button.locked{opacity:0.4; cursor:not-allowed;}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:3px; padding:20px;}
+  .panel p.lead{color:var(--ink-soft); margin-top:0; font-size:13px;}
+  .step-title{display:flex; align-items:baseline; gap:10px; margin-bottom:4px;}
+  .btn{font-family:'Inter', sans-serif; font-size:12.5px; font-weight:600; padding:8px 16px; border-radius:3px; border:1px solid var(--green-deep); background:var(--green); color:#fff; cursor:pointer;}
+  .btn:hover{background:var(--green-deep);}
+  .btn:disabled{opacity:0.4; cursor:not-allowed;}
+  .btn.secondary{background:#fff; color:var(--green-deep); border:1px solid var(--line);}
+  .btn.secondary:hover{border-color:var(--green);}
+  .btn.danger{background:var(--tomato); border-color:#8A241B; color:#fff;}
+  .btn.small{padding:5px 10px; font-size:11.5px; border-radius:3px;}
+  input[type=file]{font-family:'Inter', sans-serif; font-size:13px;}
+  select, input[type=text], input[type=number]{font-family:'Inter', sans-serif; font-size:13px; padding:6px 9px; border:1px solid #B4B4B4; border-radius:2px; background:#fff; color:var(--ink);}
+  select:focus, input:focus{outline:2px solid var(--orange); outline-offset:0;}
+  label.f{display:block; font-size:11.5px; font-weight:600; color:var(--ink-soft); margin-bottom:4px; text-transform:uppercase; letter-spacing:.02em;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:16px 0;}
+  @media (max-width:560px){.grid2{grid-template-columns:1fr;}}
+  .callout{border:1px solid var(--line); border-left:3px solid var(--green); background:var(--green-pale); border-radius:2px; padding:10px 13px; font-size:12.5px; color:var(--green-deep); margin:14px 0;}
+  .callout.warn{border-color:var(--line); border-left-color:var(--orange-deep); background:var(--orange-pale); color:var(--orange-deep);}
+  .callout.bad{border-color:var(--line); border-left-color:#8A241B; background:var(--tomato-pale); color:#8A241B;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); color:#3D3D3D; font-weight:700; position:sticky; top:0; background:#F5F6F7;}
+  td{padding:7px 10px; border-bottom:1px solid var(--line-soft);}
+  tr.flag td{background:var(--orange-pale);}
+  tr.rowMerma td{background:var(--tomato-pale);}
+  tr.rowAjuste td{background:var(--orange-pale);}
+  .num-cell{font-variant-numeric:tabular-nums; text-align:right;}
+  .scroll{max-height:340px; overflow-y:auto; border:1px solid var(--line);}
+  .capture{display:grid; grid-template-columns:1fr; gap:18px; max-width:480px; margin:0 auto;}
+  .capture .clave-tag{display:inline-block; font-size:11.5px; font-weight:600; color:var(--ink-soft); border:1px solid var(--line); padding:3px 9px; border-radius:2px;}
+  .capture .nombre{font-family:'Inter', sans-serif; font-size:19px; font-weight:700; margin:8px 0 2px; color:var(--green-deep);}
+  .capture .sistema{color:var(--ink-soft); font-size:12.5px;}
+  .capture input[type=text].real{font-size:30px; text-align:center; padding:14px; width:100%; font-family:'Inter', sans-serif; font-weight:700; border-radius:3px;}
+  .capture .resta{text-align:center; font-size:15px; font-weight:700; margin-top:6px;}
+  .capture .resta.pos{color:var(--tomato);}
+  .capture .resta.neg{color:var(--green);}
+  .capture .navrow{display:flex; justify-content:space-between; gap:10px;}
+  .progress-bar{height:4px; background:var(--line-soft); overflow:hidden; margin-bottom:16px;}
+  .progress-bar .fill{height:100%; background:var(--orange);}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center;}
+  .toolbar .spacer{flex:1;}
+  .pill{font-size:11px; font-weight:700; border:none; border-radius:2px; padding:3px 9px; color:var(--ink-soft); display:inline-block; background:var(--line-soft);}
+  .pill.green{color:#1F5C34; background:var(--green-pale);}
+  .pill.amber{color:#8A5A16; background:var(--orange-pale);}
+  .pill.tomato{color:#8A241B; background:var(--tomato-pale);}
+  .stats-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); margin:14px 0;}
+  .stat{background:#fff; padding:10px 14px;}
+  .stat .n{font-family:'Inter', sans-serif; font-size:20px; font-weight:700; color:var(--green-deep);}
+  .stat .l{font-size:11px; color:var(--ink-soft); font-weight:600; text-transform:uppercase; letter-spacing:.02em;}
+  footer{margin-top:34px; font-size:12px; color:var(--ink-soft); border-top:1px solid var(--line); padding-top:14px;}
+  .homeGrid{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-top:16px;}
+  @media (max-width:680px){.homeGrid{grid-template-columns:repeat(2, 1fr);}}
+  @media (max-width:460px){.homeGrid{grid-template-columns:1fr;}}
+  .homeCard{all:unset; cursor:pointer; background:#fff; border:1px solid var(--line); border-radius:3px; padding:14px; display:block;}
+  .homeCard:hover{border-color:var(--green);}
+  .homeCard-icon{width:30px; height:30px; border-radius:5px; display:flex; align-items:center; justify-content:center; font-size:15px; margin-bottom:9px;}
+  .homeCard-titulo{font-size:13px; font-weight:700; color:var(--green-deep);}
+  .homeCard-desc{font-size:11.5px; color:var(--ink-soft); margin-top:4px; line-height:1.4;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="sidebar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="48" fill="#F2994A"/>
+        <path d="M30 42 h14 a12 12 0 0 1 12 12 v10 h-14 a12 12 0 0 1 -12 -12 z" fill="#fff"/>
+        <circle cx="38" cy="68" r="4" fill="#1B4332"/>
+        <circle cx="56" cy="68" r="4" fill="#1B4332"/>
+        <path d="M52 42 q0 -14 14 -16 q-2 12 -14 16" fill="#fff"/>
+      </svg>
+      <span>Inventarios</span>
+    </div>
+    <div id="procTabs" class="procTabs"></div>
+  </nav>
+  <div class="main">
+    <div class="app">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="layout">
+        <nav class="rail" id="rail"></nav>
+        <div class="panel" id="panel"></div>
+      </div>
+      <footer>
+        Corre completo en tu navegador — nada se sube a ningún servidor. Guarda este archivo y ábrelo cuando lo necesites.
+        La importación a Microsip sigue siendo manual, como ya lo haces.
+      </footer>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* ===================== CATÁLOGO VERDURA (hoja PRODUCTOS del macro) ===================== */
+const CATALOGO_VERDURA = [{"n": "ACELGAS", "c": "AC"}, {"n": "AGUACATE", "c": "00001"}, {"n": "AGUACATE EN MALLA", "c": "132"}, {"n": "AJO", "c": "00005"}, {"n": "APIO", "c": "00002"}, {"n": "BERENJENA", "c": "00040"}, {"n": "BETABEL", "c": "BET"}, {"n": "BLUEBERRY SUPREME", "c": "852575008369"}, {"n": "BROCOLI", "c": "00006"}, {"n": "CALABACITA", "c": "00020"}, {"n": "CALABAZA HALLOWEN MINI", "c": "CHMM"}, {"n": "CALABAZA HALLOWEN.", "c": "CALH"}, {"n": "CAMOTE", "c": "00021"}, {"n": "CAÑA PIEZA", "c": "CAÑA"}, {"n": "CEBOLLA AMARILLA", "c": "00159"}, {"n": "CEBOLLA BLANCA", "c": "00013"}, {"n": "CEBOLLA MORADA", "c": "00121"}, {"n": "CEBOLLITAS RABO PZ", "c": "153"}, {"n": "CHAMOPIÑONCHAMPIÑONES FRESCOS  MONTE BLANCO 225G", "c": "7501024202010"}, {"n": "CHAYOTE", "c": "00033"}, {"n": "CHILACA", "c": "00024"}, {"n": "CHILACA GUERA", "c": "00246"}, {"n": "CHILE CARIBE", "c": "00028"}, {"n": "CHILE HABANERO KG", "c": "00242"}, {"n": "JALAPEÑO KG", "c": "00027"}, {"n": "JALAPEÑO ROJO KG", "c": "JALR"}, {"n": "CHILE MORRON KG", "c": "00025"}, {"n": "CHILE POBLANO KG", "c": "00026"}, {"n": "CHILE SERRANO KG", "c": "00029"}, {"n": "SERRANO ROJO", "c": "SER"}, {"n": "CILANTRO", "c": "17"}, {"n": "CIRUELA CHICA", "c": "00308"}, {"n": "CIRUELA GRANDE", "c": "00308"}, {"n": "COCO DE BARRA", "c": "00014"}, {"n": "COCO DE AGUA", "c": "COCO"}, {"n": "COLIFLOR", "c": "COL"}, {"n": "DURAZNO KG", "c": "00034"}, {"n": "EJOTE", "c": "00036"}, {"n": "ELOTE", "c": "EL1"}, {"n": "ESPINACAS MANOJO", "c": "EM"}, {"n": "ESPINACAS POPEYE", "c": "796631581048"}, {"n": "FRESA", "c": "0231"}, {"n": "GERMINADO DE SOYA KG", "c": "00123"}, {"n": "GRANADA", "c": "00228"}, {"n": "GRANADA CHINA", "c": "00177"}, {"n": "GUAYABA", "c": "GUA"}, {"n": "HIERBABUENA", "c": "01055"}, {"n": "HIGO", "c": "316"}, {"n": "JENGIBRE KG", "c": "00236"}, {"n": "JICAMA", "c": "00048"}, {"n": "KIWI", "c": "00049"}, {"n": "LECHUGA", "c": "14"}, {"n": "LECHUGA OREJONA", "c": "LO"}, {"n": "LIMON AGRIO/LIMON", "c": "00051"}, {"n": "LIMON AMARILLO KG", "c": "00067"}, {"n": "LIMON CHICO/ LIMON MALLA/PERSA", "c": "00502"}, {"n": "MANDARINA", "c": "00054"}, {"n": "MANDARINA MALLA/MANDARINA MINI", "c": "MM"}, {"n": "MANGO HADEN", "c": "00056"}, {"n": "MANGO ATAULFO KG", "c": "00057"}, {"n": "MANZANA AMARILLA", "c": "00059"}, {"n": "MANZANA ROJA", "c": "00058"}, {"n": "MELON", "c": "00061"}, {"n": "MELON GOTA DE MIEL", "c": "00064"}, {"n": "ATE DE MEMBRILLO PZ", "c": "7501550400058"}, {"n": "NARANJA", "c": "00062"}, {"n": "PAPA AMERICANA/PAPA MORENA", "c": "00179"}, {"n": "PAPA CAMBRAY", "c": "00261"}, {"n": "PAPA LAVADA", "c": "00065"}, {"n": "PAPAYA AMARILLA", "c": "00068"}, {"n": "PEPINO", "c": "00072"}, {"n": "PEPINO EUROPEO", "c": "00144"}, {"n": "PERAS", "c": "00071"}, {"n": "PEREJIL MANOJO", "c": "141"}, {"n": "PERSIMONIO", "c": "00306"}, {"n": "PIÑA", "c": "PIÑ"}, {"n": "PLATANO", "c": "00073"}, {"n": "PORTOBELLA ENTERO MONTE BLANCO 500g", "c": "7501024216062"}, {"n": "PLATANO DOMINICO", "c": "00171"}, {"n": "PLATANO MACHO", "c": "PLAM"}, {"n": "RAMBUTAN", "c": "00460"}, {"n": "RABANOS pz.", "c": "140"}, {"n": "REPOLLO", "c": "00076"}, {"n": "REPOLLO MORADO", "c": "00069"}, {"n": "SANDIA", "c": "00078"}, {"n": "SANDIA MINI", "c": "SAMI"}, {"n": "TEJOCOTE", "c": "TE"}, {"n": "TOMATE BOLA/ SALADETTE", "c": "00082"}, {"n": "TOMATE CHERRY ORGANIC MR LUCKY", "c": "796631671015"}, {"n": "TOMATE SALADETTE", "c": "TOSA"}, {"n": "TOMATILLO", "c": "00080"}, {"n": "TORONJA", "c": "00079"}, {"n": "TUNA BLANCA/TUNA VERDE", "c": "00233"}, {"n": "TUNA ROJA", "c": "01035"}, {"n": "UVA ROJA", "c": "00084"}, {"n": "UVA VERDE/UVA BLANCA", "c": "00085"}, {"n": "ZARZAMORA NATURIPE FARMED FRESH 170G", "c": "033383240268"}, {"n": "ZANAHORIA", "c": "00086"}, {"n": "ZANAHORIA BABY GRIMMWAY FARMS  908gr", "c": "033383666044"}, {"n": "PENCA SABILA OKKO", "c": "7500462648046"}, {"n": "CHICHARO", "c": "00279"}, {"n": "ROMERO", "c": "0606"}, {"n": "MENTA 50 GR", "c": "7503018987064"}, {"n": "ESPARRAGOS", "c": "ESPARRAGO"}, {"n": "HONGOS CREMINI  MONTE BLANCO 225g+", "c": "7501024225095"}, {"n": "CHAMPIÑONES REBANADOS MONTE BLANCO 225G", "c": "7501024225101"}, {"n": "ENSALADA ITALIANA MR LUCKY 908g", "c": "796631731467"}, {"n": "CORAZON DE APIO/APIO Mr. LUCKY ORGANIC 4 PIEZAS", "c": "796631105152"}, {"n": "NOPAL", "c": "NO"}, {"n": "MAMEY KG.", "c": "00270"}, {"n": "CURCUMA", "c": "CUR"}, {"n": "GUANABANA", "c": "00271"}, {"n": "FRAMBUESA FRESAMEX 170g", "c": "7503011628025"}, {"n": "NECTARINA KG", "c": "00055"}, {"n": "CEREZA KG", "c": "00018"}, {"n": "MR LUCKY BROCOLI Y ZANAHORIA 454GR", "c": "796631161196"}, {"n": "FLORETE DE BROCOLI Y COLIFLOR", "c": "796631161202"}, {"n": "FLORETE DE COLIFLOR", "c": "796631281054"}, {"n": "PALITO APIO 1KG", "c": "796631105473"}, {"n": "CHABACANO", "c": "00032"}, {"n": "FLORETE DE BROCOLI", "c": "796631161059"}, {"n": "PALITO DE APIO 400G", "c": "796631105213"}, {"n": "PALITOS DE APIO MR LUCKY 800G", "c": "796631105428"}, {"n": "CHICOPAZOTE", "c": "CHICO"}, {"n": "CARAMBOLO", "c": "00311"}, {"n": "MINI PEPINO MR LUCKY 500G", "c": "796631541035"}, {"n": "COLIFLOR NARANJA/MORADA MR. LUCKY", "c": "796631281221"}, {"n": "FLOR DE CALABAZA", "c": "FC"}, {"n": "PITAHAYA KG", "c": "01037"}, {"n": "CHABACIRUELA (APRIUMS) FAMILY TREE 454G", "c": "813187010614"}, {"n": "MARACUYA", "c": "00149"}, {"n": "CHILE GUERO HUNGARO", "c": "00131"}, {"n": "MELON PIEL DE SAPO", "c": "00152"}, {"n": "SANDIA AMARILLA", "c": "00169"}, {"n": "YACA", "c": "00175"}, {"n": "MEMBRILLO KG", "c": "00181"}, {"n": "PENCA DE NOPAL KG", "c": "00234"}, {"n": "CIRUELA KG", "c": "00308"}, {"n": "CEBOLLA BLANCA CHICA KG", "c": "00501"}, {"n": "TOMATE CHICO KG", "c": "00503"}, {"n": "CALABAZA DE CASCO", "c": "00545"}, {"n": "UVA TRICOLOR 1.36KG", "c": "011110613561"}, {"n": "MANZANA ESCOLAR 1.36KG", "c": "090922"}, {"n": "HIGO 460G", "c": "1017"}, {"n": "SANDIA SIN SEMILLA", "c": "SANS"}, {"n": "DURAZNO OFERTA", "c": "00454"}, {"n": "PLATANO OFERTA", "c": "230"}, {"n": "PEPINO OFERTA", "c": "00461"}, {"n": "CALABACITA OFERTA", "c": "00544"}, {"n": "OFERTA AGUACATE", "c": "00541"}, {"n": "NARANJA OFERTA", "c": "00463"}, {"n": "LIMON OFERTA", "c": "00357"}, {"n": "MANGO MADURO", "c": "00361"}, {"n": "PERA A MITAD DE PRECIO", "c": "00363"}, {"n": "OFERTA GUAYABA", "c": "00540"}, {"n": "OFERTA MANDARINA", "c": "00360"}, {"n": "OFERTA PAPA LAVADA", "c": "00289"}, {"n": "OFERTA GRANADA", "c": "00280"}, {"n": "OFERTA CHILACA", "c": "00539"}, {"n": "TOMATE OFERTA", "c": "00356"}, {"n": "SERRANO OFERTA", "c": "00099"}, {"n": "PAPA OFERTA", "c": "00358"}, {"n": "JALAPEÑO OFERTA", "c": "00359"}, {"n": "CEBOLLA BLANCA OFERTA", "c": "00462"}, {"n": "POBLANO OFERTA", "c": "00290"}];
+
+/* ===================== HELPERS COMPARTIDOS ===================== */
+function limpiaClave(v){ return String(v==null?'':v).trim().toUpperCase().replace(/\s+/g,''); }
+function parseNum(v){
+  if(v==null || v==='') return NaN;
+  if(typeof v === 'number') return v;
+  const s = String(v).trim().replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : n;
+}
+function fmtNum(n){ if(n==null || isNaN(n)) return ''; const r = Math.round(n*10000000000)/10000000000; return r.toString(); }
+function fmtMoney(n){ if(n==null || isNaN(n)) return ''; return n.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function pad2(n){return n<10 ? '0'+n : ''+n;}
+function fechaHoy(){ const d = new Date(); return pad2(d.getDate())+'-'+pad2(d.getMonth()+1)+'-'+String(d.getFullYear()).slice(-2); }
+function colLetter(i){ let s=''; i++; while(i>0){ const m=(i-1)%26; s=String.fromCharCode(65+m)+s; i=Math.floor((i-1)/26); } return s; }
+const SALIDAS_UMBRAL = 6;
+function MgetCapturables(st){ return st.productos.filter(p=>p.salidas > SALIDAS_UMBRAL).sort((a,b)=>b.salidas-a.salidas); }
+function readWorkbookRows(file, cb){
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    const data = new Uint8Array(evt.target.result);
+    const wb = XLSX.read(data, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+    cb(rows);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ===================== REGISTRO DE PROCESOS ===================== */
+const PROCESOS = [
+  {id:'home',      label:'Inicio',                     steps:[]},
+  {id:'verdura',   label:'Lunes · Verdura',            steps:['Conteo de verdura']},
+  {id:'miercoles', label:'Miércoles · Rectificación',  steps:['Cargar reporte','Captura real','Costeo de diferencias']},
+  {id:'negativos', label:'Negativos',                  steps:['Cargar reporte','Captura real','Generar archivo']},
+  {id:'tarima',    label:'Mermas de Tarima',           steps:['Registrar y descargar']},
+  {id:'analisis',  label:'Análisis de Mermas',         steps:['Cargar reportes y ver análisis']},
+  {id:'mensual',   label:'Inventario Mensual',         steps:['Cargar reporte','Captura real','Generar archivos']},
+];
+
+let state = {
+  proceso: 'home',
+  verdura: {
+    step:1, maxStepReached:1, rows:[], extras:[],
+    reportCols:{claveCol:null, existCol:null, headerRow:null, rawRows:null, headers:[]},
+    captureIndex:0, captureMode:'stepper'
+  },
+  miercoles: {
+    step:1, maxStepReached:1,
+    productos:[], costIndex:{}, meta:{fecha:'', linea:''},
+    captureIndex:0, captureMode:'stepper',
+    costeo:[], buscador:''
+  },
+  negativos: {
+    step:1, maxStepReached:1,
+    productos:[],
+    captureIndex:0, captureMode:'stepper'
+  },
+  tarima: {
+    step:1, maxStepReached:1,
+    tablaActual: 'DAÑO', dano: [], caducidad: []
+  },
+  analisis: {
+    step:1, maxStepReached:1,
+    caducidad: null, dano: null, topN: 5
+  },
+  mensual: {
+    step:1, maxStepReached:1,
+    nombreInventario: 'SAMS',
+    productos:[],
+    captureIndex:0, captureMode:'stepper'
+  }
+};
+
+/* ===================== SHELL: TABS + RAIL ===================== */
+function renderProcTabs(){
+  const el = document.getElementById('procTabs');
+  el.innerHTML = PROCESOS.map(p=>`<button data-id="${p.id}" class="${state.proceso===p.id?'active':''}">${p.label}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>{
+    b.onclick = ()=>{ state.proceso = b.dataset.id; render(); };
+  });
+}
+function renderRail(){
+  const proc = PROCESOS.find(p=>p.id===state.proceso);
+  const st = state[state.proceso];
+  const rail = document.getElementById('rail');
+  const layout = document.querySelector('.layout');
+  rail.innerHTML = '';
+  if(proc.steps.length<=1){
+    if(layout) layout.style.gridTemplateColumns = '1fr';
+    return;
+  }
+  if(layout) layout.style.gridTemplateColumns = '';
+  proc.steps.forEach((label,i)=>{
+    const n = i+1;
+    const locked = n > st.maxStepReached;
+    const btn = document.createElement('button');
+    btn.className = (st.step===n?'active ':'') + (n<st.step?'done ':'') + (locked?'locked':'');
+    btn.innerHTML = `<span class="num">${n}</span><span>${label}</span>`;
+    btn.disabled = locked;
+    btn.onclick = ()=>{ if(!locked){ st.step = n; render(); } };
+    rail.appendChild(btn);
+  });
+}
+function renderBreadcrumb(){
+  const el = document.getElementById('breadcrumb');
+  if(!el) return;
+  const proc = PROCESOS.find(p=>p.id===state.proceso);
+  const st = state[state.proceso];
+  if(proc.steps.length<=1){
+    el.innerHTML = `Inventarios <span class="sep">›</span> <span class="current">${proc.label}</span>`;
+    return;
+  }
+  const stepLabel = proc.steps[(st.step||1)-1] || proc.steps[0];
+  el.innerHTML = `Inventarios <span class="sep">›</span> ${proc.label} <span class="sep">›</span> <span class="current">${stepLabel}</span>`;
+}
+function render(){
+  renderProcTabs();
+  renderRail();
+  renderBreadcrumb();
+  const panel = document.getElementById('panel');
+  panel.innerHTML = '';
+  if(state.proceso==='home') renderHome(panel);
+  if(state.proceso==='verdura') renderVerdura(panel);
+  if(state.proceso==='miercoles') renderMiercoles(panel);
+  if(state.proceso==='negativos') renderNegativos(panel);
+  if(state.proceso==='tarima') renderTarima(panel);
+  if(state.proceso==='analisis') renderAnalisis(panel);
+  if(state.proceso==='mensual') renderMensual(panel);
+}
+
+const HOME_CARDS = [
+  {id:'verdura',   icon:'🥬', titulo:"Lunes · Verdura",           desc:"Sube el reporte y captura el conteo semanal, producto por producto.", bg:'#EAF4EE', fg:'#2F6844'},
+  {id:'miercoles', icon:'⚖️', titulo:"Miércoles · Rectificación", desc:"Compara teórico vs. real, clasifica merma y calcula el costo.",       bg:'#FDF0E3', fg:'#D9782B'},
+  {id:'negativos', icon:'⚠️', titulo:"Negativos",                 desc:"Corrige artículos con existencia negativa en el sistema.",             bg:'#FCEAE5', fg:'#B23A2E'},
+  {id:'tarima',    icon:'🔫', titulo:"Mermas de Tarima",          desc:"Registra daño y caducidad rápido con la pistola de código.",           bg:'#EAF4EE', fg:'#2F6844'},
+  {id:'analisis',  icon:'📊', titulo:"Análisis de Mermas",        desc:"Reporte mensual con Top 5 y gráfica Pareto por categoría.",             bg:'#FDF0E3', fg:'#D9782B'},
+  {id:'mensual',   icon:'🏬', titulo:"Inventario Mensual",        desc:"SAM'S, USA, Walmart o cualquier otro inventario externo.",              bg:'#FCEAE5', fg:'#B23A2E'},
+];
+
+function HOMEestado(id){
+  if(id==='verdura'){
+    const st = state.verdura;
+    if(st.rows.length) return `${st.rows.filter(r=>r.matched).length}/${st.rows.length} cargados`;
+  }
+  if(id==='miercoles'){
+    const st = state.miercoles;
+    if(st.productos.length) return `${MgetCapturables(st).filter(r=>r.real===null).length} por capturar`;
+  }
+  if(id==='negativos'){
+    const st = state.negativos;
+    if(st.productos.length) return `${st.productos.filter(r=>r.real===null).length} por capturar`;
+  }
+  if(id==='tarima'){
+    const st = state.tarima;
+    const n = st.dano.length + st.caducidad.length;
+    if(n) return `${n} registrados hoy`;
+  }
+  if(id==='mensual'){
+    const st = state.mensual;
+    if(st.productos.length) return `${st.nombreInventario} · ${st.productos.filter(r=>r.real===null).length} por capturar`;
+  }
+  return '';
+}
+
+function renderHome(panel){
+  panel.innerHTML = `
+    <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; margin-bottom:2px;">CEDIS Río Grande Comercial</div>
+    <h2 style="font-size:19px;">Elige qué vas a trabajar</h2>
+    <p class="lead tag">Seis herramientas para digitalizar y cerrar los conteos de inventario.</p>
+    <div class="homeGrid">
+      ${HOME_CARDS.map(c=>{
+        const estado = HOMEestado(c.id);
+        return `<button class="homeCard" data-id="${c.id}">
+          <div class="homeCard-icon" style="background:${c.bg}; color:${c.fg};">${c.icon}</div>
+          <div class="homeCard-titulo">${c.titulo}</div>
+          <div class="homeCard-desc">${estado || c.desc}</div>
+        </button>`;
+      }).join('')}
+    </div>
+  `;
+  panel.querySelectorAll('.homeCard').forEach(b=>{
+    b.onclick = ()=>{ state.proceso = b.dataset.id; render(); };
+  });
+}
+
+/* =====================================================================
+   PROCESO: VERDURA (LUNES) — versión simplificada, una sola pantalla
+   ===================================================================== */
+function renderVerdura(panel){
+  const st = state.verdura;
+  panel.innerHTML = `
+    <div id="vUploadArea"></div>
+    <div id="vCaptureArea" style="margin-top:18px;"></div>
+    <div id="vDownloadArea" style="margin-top:18px;"></div>
+  `;
+  VrenderUpload(st);
+  if(st.rows.length) VrenderCapturaSimple(st);
+  if(st.captureIndex >= st.rows.length && st.rows.length) VrenderDescargaSimple(st);
+}
+
+function VrenderUpload(st){
+  const area = document.getElementById('vUploadArea');
+  if(!st.rows.length){
+    area.innerHTML = `
+      <h2>Conteo de Verdura</h2>
+      <p class="lead tag">Sube el reporte de existencias de Microsip.</p>
+      <input type="file" id="vFileInput" accept=".xlsx,.xls,.xlsm">
+      <div id="vAjusteColumnas" style="margin-top:12px;"></div>
+    `;
+    document.getElementById('vFileInput').addEventListener('change', (e)=>{
+      const file = e.target.files[0]; if(!file) return;
+      readWorkbookRows(file, (rows)=>{
+        VautoMatch(st, rows);
+        render();
+      });
+    });
+    return;
+  }
+  const matched = st.rows.filter(r=>r.matched).length;
+  const extras = st.extras || [];
+  area.innerHTML = `
+    <div class="toolbar">
+      <span class="pill green">${matched}/${st.rows.length} productos cargados</span>
+      ${extras.length ? `<button class="btn secondary small" id="vBtnVerExtras">${extras.length} fuera de catálogo</button>` : ''}
+      <div class="spacer"></div>
+      <button class="btn secondary small" id="vBtnCambiarArchivo">Cambiar archivo</button>
+    </div>
+    <div id="vExtrasWrap"></div>
+  `;
+  document.getElementById('vBtnCambiarArchivo').onclick = ()=>{
+    st.rows = []; st.extras = []; st.captureIndex = 0; render();
+  };
+  const extrasBtn = document.getElementById('vBtnVerExtras');
+  if(extrasBtn) extrasBtn.onclick = ()=>{
+    const wrap = document.getElementById('vExtrasWrap');
+    wrap.innerHTML = wrap.innerHTML ? '' : VextrasTablaHtml(st);
+    VbindExtrasHandlers(st, wrap);
+  };
+}
+
+function VextrasTablaHtml(st){
+  const extras = st.extras || [];
+  return `<div class="callout" style="margin-top:10px;">Productos del reporte que no están en tu catálogo — decide uno por uno:
+    <div class="scroll" style="margin-top:8px; max-height:220px;"><table>
+      <thead><tr><th>Clave</th><th>Nombre</th><th class="num-cell">Existencia</th><th colspan="2">Acción</th></tr></thead>
+      <tbody id="vExtrasBody">${extras.map((e,i)=>VextraRow(e,i)).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+function VbindExtrasHandlers(st, wrap){
+  wrap.querySelectorAll('[data-agregar]').forEach(b=>{
+    b.onclick = ()=>{
+      const i = parseInt(b.dataset.agregar,10);
+      const e = st.extras[i];
+      e.decision = 'agregar';
+      const nombreFinal = e.nombre || e.clave;
+      CATALOGO_VERDURA.push({n:nombreFinal, c:e.clave});
+      st.rows.push({n:nombreFinal, c:e.clave, sistema:e.existencia, matched:true, real:null, resta:null});
+      wrap.innerHTML = VextrasTablaHtml(st);
+      VbindExtrasHandlers(st, wrap);
+      render();
+    };
+  });
+  wrap.querySelectorAll('[data-baja]').forEach(b=>{
+    b.onclick = ()=>{
+      const i = parseInt(b.dataset.baja,10);
+      st.extras[i].decision = 'baja';
+      wrap.innerHTML = VextrasTablaHtml(st);
+      VbindExtrasHandlers(st, wrap);
+    };
+  });
+}
+function VextraRow(e,i){
+  if(e.decision==='agregar') return `<tr><td>${e.clave}</td><td>${e.nombre||'(sin nombre)'}</td><td class="num-cell">${fmtNum(e.existencia)}</td><td colspan="2"><span class="pill green">Agregado ✓</span></td></tr>`;
+  if(e.decision==='baja') return `<tr><td>${e.clave}</td><td>${e.nombre||'(sin nombre)'}</td><td class="num-cell">${fmtNum(e.existencia)}</td><td colspan="2"><span class="pill amber">Baja (Salida ${fmtNum(e.existencia)})</span></td></tr>`;
+  return `<tr><td>${e.clave}</td><td>${e.nombre||'(sin nombre)'}</td><td class="num-cell">${fmtNum(e.existencia)}</td>
+    <td><button class="btn small" data-agregar="${i}">Agregar</button></td>
+    <td><button class="btn small danger" data-baja="${i}">Baja</button></td>
+  </tr>`;
+}
+
+function VautoMatch(st, rows){
+  st.reportCols.rawRows = rows;
+  let headerRow = -1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const joined = rows[i].join(' ').toLowerCase();
+    if(joined.includes('clave') || joined.includes('artículo') || joined.includes('articulo')){ headerRow = i; break; }
+  }
+  if(headerRow<0) headerRow = 0;
+  st.reportCols.headerRow = headerRow;
+  const headers = rows[headerRow] || [];
+  st.reportCols.headers = headers;
+  let claveCol = headers.findIndex(h=>/clave/i.test(h));
+  let existCol = headers.findIndex(h=>/exist/i.test(h));
+  if(claveCol<0) claveCol = 0;
+  if(existCol<0) existCol = Math.min(11, headers.length-1);
+  VejecutarMatch(st, claveCol, existCol);
+}
+
+function VejecutarMatch(st, claveCol, existCol){
+  const rows = st.reportCols.rawRows.slice(st.reportCols.headerRow+1);
+  const mapText = new Map(), mapNumeric = new Map();
+  const reportEntries = [];
+  const SKIP_ROW = /^(l[ií]nea|almac[eé]n|\d+\s+art[íi]culos|total\s+\d+\s+art[íi]culos|solo\s+existencias)/i;
+  rows.forEach(r=>{
+    const rawClave = r[claveCol];
+    if(rawClave===undefined || rawClave==='') return;
+    const claveTxt = String(rawClave).trim();
+    if(SKIP_ROW.test(claveTxt)) return;
+    const cl = limpiaClave(rawClave);
+    const ex = parseNum(r[existCol]);
+    mapText.set(cl, isNaN(ex)?0:ex);
+    const asNum = parseFloat(cl);
+    if(!isNaN(asNum)) mapNumeric.set(String(asNum), isNaN(ex)?0:ex);
+    let nombre='';
+    for(let c=claveCol+1; c<existCol; c++){
+      const v = r[c];
+      if(v!==undefined && v!==null && String(v).trim()!==''){ nombre=String(v).trim(); break; }
+    }
+    reportEntries.push({claveOriginal:claveTxt, claveNorm:cl, existencia:isNaN(ex)?0:ex, nombre});
+  });
+  st.rows = CATALOGO_VERDURA.map(p=>{
+    const cl = limpiaClave(p.c);
+    let sistema, matched;
+    if(mapText.has(cl)){ sistema = mapText.get(cl); matched = true; }
+    else {
+      const asNum = parseFloat(cl);
+      if(!isNaN(asNum) && mapNumeric.has(String(asNum))){ sistema = mapNumeric.get(String(asNum)); matched = true; }
+      else { sistema = 0; matched = false; }
+    }
+    return {n:p.n, c:p.c, sistema, matched, real:null, resta:null};
+  });
+  const catalogNormSet = new Set(CATALOGO_VERDURA.map(p=>limpiaClave(p.c)));
+  const catalogNumericSet = new Set(CATALOGO_VERDURA.map(p=>{ const n=parseFloat(limpiaClave(p.c)); return isNaN(n)?null:String(n); }).filter(x=>x!==null));
+  st.extras = reportEntries.filter(e=>{
+    if(catalogNormSet.has(e.claveNorm)) return false;
+    const asNum = parseFloat(e.claveNorm);
+    if(!isNaN(asNum) && catalogNumericSet.has(String(asNum))) return false;
+    return true;
+  }).map(e=>({clave:e.claveOriginal, nombre:e.nombre, existencia:e.existencia, decision:null}));
+  st.captureIndex = 0;
+}
+
+function VrenderCapturaSimple(st){
+  const area = document.getElementById('vCaptureArea');
+  const total = st.rows.length;
+  const i = st.captureIndex;
+  if(i >= total){
+    area.innerHTML = `<div class="callout">Captura completa ✓ — <a href="#" id="vLinkRevisar">revisar de nuevo</a></div>`;
+    document.getElementById('vLinkRevisar').onclick = (e)=>{ e.preventDefault(); st.captureIndex=0; render(); };
+    return;
+  }
+  const r = st.rows[i];
+  area.innerHTML = `
+    <div class="progress-bar"><div class="fill" style="width:${((i+1)/total*100).toFixed(0)}%"></div></div>
+    <div class="capture">
+      <div style="text-align:center;">
+        <div class="nombre">${r.n}</div>
+        <div class="sistema">Sistema: ${fmtNum(r.sistema)} · ${i+1} de ${total}</div>
+      </div>
+      <div>
+        <input type="text" inputmode="decimal" class="real" id="vRealBox" placeholder="Cantidad real" value="${r.real===null?'':fmtNum(r.real)}">
+      </div>
+      <div class="navrow">
+        <button class="btn secondary" id="vBtnAnterior" ${i===0?'disabled':''}>← Anterior</button>
+        <button class="btn" id="vBtnSiguiente">${i===total-1?'Finalizar':'Siguiente →'}</button>
+      </div>
+    </div>
+  `;
+  const realBox = document.getElementById('vRealBox');
+  realBox.focus(); realBox.select();
+  realBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); goNext(); } });
+  document.getElementById('vBtnSiguiente').onclick = goNext;
+  document.getElementById('vBtnAnterior').onclick = ()=>{ VsetReal(st, i, realBox.value); if(i>0){ st.captureIndex--; render(); } };
+  function goNext(){
+    VsetReal(st, i, realBox.value);
+    st.captureIndex++;
+    render();
+  }
+}
+function VsetReal(st, idx, val){
+  const r = st.rows[idx];
+  const v = parseNum(val);
+  if(val==='' || val===null || isNaN(v)){ r.real = null; r.resta = null; }
+  else { r.real = v; r.resta = Math.round((r.sistema - v)*10000000000)/10000000000; }
+}
+
+function VrenderDescargaSimple(st){
+  const area = document.getElementById('vDownloadArea');
+  const capturados = st.rows.filter(r=>r.real!==null);
+  const salidas = capturados.filter(r=>r.resta > 0.0000000001);
+  const entradas = capturados.filter(r=>r.resta < -0.0000000001);
+  const bajasExtras = (st.extras||[]).filter(e=>e.decision==='baja').map(e=>({c:e.clave, n:e.nombre||e.clave, resta:e.existencia}));
+  const salidasTotal = salidas.concat(bajasExtras);
+  area.innerHTML = `
+    <div class="grid2">
+      <button class="btn" id="vBtnDescargarSalidas" ${!salidasTotal.length?'disabled':''}>Descargar Salidas (${salidasTotal.length})</button>
+      <button class="btn" id="vBtnDescargarEntradas" ${!entradas.length?'disabled':''}>Descargar Entradas (${entradas.length})</button>
+    </div>
+  `;
+  document.getElementById('vBtnDescargarSalidas').onclick = ()=>Vdescargar(salidasTotal, 'Salidas_Sobrantes_'+fechaHoy()+'.xlsx', r=>r.resta);
+  document.getElementById('vBtnDescargarEntradas').onclick = ()=>Vdescargar(entradas, 'Entradas_Faltantes_'+fechaHoy()+'.xlsx', r=>Math.abs(r.resta));
+}
+function Vdescargar(rows, filename, cantFn){
+  const aoa = [[]];
+  rows.forEach(r=>{ aoa.push([r.c, cantFn(r)]); });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
+}
+
+/* =====================================================================
+   PROCESO: MIÉRCOLES — RECTIFICACIÓN DE CONTEO
+   ===================================================================== */
+function renderMiercoles(panel){
+  const st = state.miercoles;
+  if(st.step===1) MStep1(panel, st);
+  if(st.step===2) MStep2(panel, st);
+  if(st.step===3) MStep3(panel, st);
+}
+
+/* ---- parseo del reporte crudo "Resultado del inventario físico" ----
+   Formato Microsip: 2 filas por producto (cantidades / costos), con celdas combinadas —
+   la posición exacta de cada columna varía según el reporte, así que se detecta sola
+   leyendo los encabezados de la fila 6/7 en vez de asumir columnas fijas.
+*/
+function MdetectarColumnas(rows, headerRow){
+  const hdr = rows[headerRow] || [];
+  function buscarCol(regex, fallback){
+    for(let i=0;i<hdr.length;i++){
+      if(hdr[i] && regex.test(String(hdr[i]))) return i;
+    }
+    return fallback;
+  }
+  const unidadCol = buscarCol(/^u\.?\s*med/i, 2);
+  const entradasCol = buscarCol(/^entradas/i, 3);
+  const salidasCol = buscarCol(/^salidas/i, 4);
+  const invFinalCol = buscarCol(/inventario\s*final/i, 5);
+
+  // nombreCol: primera celda no vacía entre la columna 1 y la de unidad, en el primer renglón de producto real
+  let nombreCol = 1;
+  const LINEA = /^l[ií]nea/i, TOTAL_ROW = /^\d+\s+art[íi]culos\s+en/i;
+  for(let i=headerRow+1; i<rows.length; i++){
+    const a = rows[i][0];
+    if(a===undefined || a===null || String(a).trim()==='') continue;
+    const aTxt = String(a).trim();
+    if(LINEA.test(aTxt) || TOTAL_ROW.test(aTxt)) continue;
+    const r = rows[i];
+    for(let ci=1; ci<unidadCol; ci++){
+      if(r[ci]!==undefined && r[ci]!==null && r[ci]!==''){ nombreCol = ci; break; }
+    }
+    break;
+  }
+  return {nombreCol, unidadCol, entradasCol, salidasCol, invFinalCol};
+}
+
+function MparseReporte(rows){
+  let headerRow = -1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const a = String(rows[i][0]||'').trim().toLowerCase();
+    if(a==='artículo' || a==='articulo'){ headerRow = i; break; }
+  }
+  if(headerRow<0) headerRow = 6; // fallback: fila 7 (índice 6), como en los reportes vistos
+
+  let fecha = '', linea = '';
+  for(let i=0;i<Math.min(headerRow+4, rows.length);i++){
+    const a = String(rows[i][0]||'').trim();
+    if(/^al\s+\d/i.test(a)) fecha = a;
+    if(/^l[ií]nea/i.test(a)) linea = a.replace(/^l[ií]nea:?\s*/i,'');
+  }
+
+  const cols = MdetectarColumnas(rows, headerRow);
+  const productos = [];
+  const costIndex = {};
+  const TOTAL_ROW = /^\d+\s+art[íi]culos\s+en/i;
+  for(let i=headerRow+1; i<rows.length; i++){
+    const r = rows[i];
+    const clave = r[0];
+    if(clave===undefined || clave===null || String(clave).trim()==='') continue;
+    const claveTxt = String(clave).trim();
+    if(/^l[ií]nea/i.test(claveTxt)) continue;   // fila "Línea: ..." — no es un producto
+    if(TOTAL_ROW.test(claveTxt)) break;          // fila de totales al final del reporte — de aquí en adelante ya no hay productos
+    const nombre = r[cols.nombreCol]!==undefined ? r[cols.nombreCol] : '';
+    const unidad = r[cols.unidadCol];
+    const entradas = parseNum(r[cols.entradasCol]);
+    const salidas = parseNum(r[cols.salidasCol]);
+    const teorico = parseNum(r[cols.invFinalCol]);
+    const next = rows[i+1];
+    let costRow = null;
+    if(next && (next[0]===undefined || next[0]===null || String(next[0]).trim()==='')){
+      const camposCosto = [cols.entradasCol, cols.salidasCol, cols.invFinalCol];
+      const hasNums = camposCosto.some(ci => next[ci]!=='' && next[ci]!=null && !isNaN(parseNum(next[ci])));
+      if(hasNums){
+        costRow = { entradasCosto: parseNum(next[cols.entradasCol]), salidasCosto: parseNum(next[cols.salidasCol]), invFinalCosto: parseNum(next[cols.invFinalCol]) };
+      }
+    }
+    const claveL = String(clave).trim();
+    const salidasNum = isNaN(salidas)?0:salidas;
+    let costoUnitario = null;
+    if(costRow && costRow.salidasCosto!=null && !isNaN(costRow.salidasCosto) && salidasNum>0){
+      costoUnitario = costRow.salidasCosto / salidasNum;
+    }
+    productos.push({
+      clave: claveL, nombre: String(nombre||'').trim(), unidad,
+      entradas: isNaN(entradas)?0:entradas, salidas: salidasNum, teorico: isNaN(teorico)?0:teorico,
+      costoUnitario,
+      pasillo:null, bodega:null, real:null, diferencia:null, etiqueta:null, montoMerma:null, pista:null
+    });
+    costIndex[limpiaClave(claveL)] = costRow;
+  }
+  return {productos, costIndex, meta:{fecha, linea}};
+}
+
+function MStep1(panel, st){
+  panel.innerHTML = `
+    <div class="step-title"><h2>1. Cargar reporte de inventario físico</h2></div>
+    <p class="lead tag">En Microsip: genera "Resultado del inventario físico" tal cual sale, sin limpiar nada — la app detecta y colapsa sola las filas de costo.</p>
+    <div class="callout">Sube aquí el reporte crudo (.xlsx / .xls) de la línea que contaste el martes.</div>
+    <input type="file" id="mFileInput" accept=".xlsx,.xls,.xlsm">
+    <div id="mParseArea"></div>
+  `;
+  document.getElementById('mFileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    readWorkbookRows(file, (rows)=>{
+      const parsed = MparseReporte(rows);
+      st.productos = parsed.productos;
+      st.costIndex = parsed.costIndex;
+      st.meta = parsed.meta;
+      st.maxStepReached = Math.max(st.maxStepReached, 2);
+      MrenderParseSummary(st);
+    });
+  });
+  if(st.productos.length) MrenderParseSummary(st);
+}
+
+function MrenderParseSummary(st){
+  const area = document.getElementById('mParseArea');
+  if(!area) return;
+  const conCosto = st.productos.filter(p=>st.costIndex[limpiaClave(p.clave)]).length;
+  area.innerHTML = `
+    <div class="stats-row">
+      <div class="stat"><div class="n">${st.productos.length}</div><div class="l">productos detectados</div></div>
+      <div class="stat"><div class="n">${conCosto}</div><div class="l">con fila de costo emparejada</div></div>
+    </div>
+    <div class="callout">${st.meta.fecha || '(sin fecha detectada)'} ${st.meta.linea ? ' · Línea: '+st.meta.linea : ''}</div>
+    <button class="btn" id="mBtnToStep2">Continuar a captura →</button>
+  `;
+  document.getElementById('mBtnToStep2').onclick = ()=>{ st.step=2; render(); };
+}
+
+function MStep2(panel, st){
+  if(!st.productos.length){ panel.innerHTML = `<div class="callout bad">Primero carga el reporte en el paso 1.</div>`; return; }
+  const capturables = MgetCapturables(st);
+  panel.innerHTML = `
+    <div class="step-title"><h2>2. Captura del inventario real</h2></div>
+    <p class="lead tag">Solo se recuenta lo que tiene <b>Salidas &gt; ${SALIDAS_UMBRAL}</b> (${capturables.length} de ${st.productos.length} productos). Si Real es menor a Salidas, se considera MERMA (aunque el ajuste a Microsip resulte Entrada), con el costo calculado por unidad.</p>
+    <div class="toolbar">
+      <button class="btn secondary small" id="mBtnModeStepper">Uno por uno</button>
+      <button class="btn secondary small" id="mBtnModeTabla">Vista de tabla (ordenada por Salidas)</button>
+      <div class="spacer"></div>
+      <input type="text" id="mBuscador" placeholder="Buscar producto..." style="min-width:180px;">
+      <button class="btn small" id="mBtnFinalizarYa">Finalizar captura →</button>
+    </div>
+    <div id="mCaptureBody"></div>
+  `;
+  document.getElementById('mBtnFinalizarYa').onclick = ()=>{ st.maxStepReached = Math.max(st.maxStepReached,3); st.step=3; render(); };
+  document.getElementById('mBtnModeStepper').onclick = ()=>{ st.captureMode='stepper'; MrenderCaptureBody(st); };
+  document.getElementById('mBtnModeTabla').onclick = ()=>{ st.captureMode='tabla'; MrenderCaptureBody(st); };
+  document.getElementById('mBuscador').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toUpperCase();
+    if(!q) return;
+    if(st.captureMode==='stepper'){
+      const idx = MgetCapturables(st).findIndex(r=>r.nombre.toUpperCase().includes(q));
+      if(idx>=0){ st.captureIndex = idx; MrenderCaptureBody(st); }
+    } else { MrenderCaptureBody(st, q); }
+  });
+  MrenderCaptureBody(st);
+}
+
+function Mrectificar(r){
+  const TOL = 0.000001;
+  const diff = Math.round((r.real - r.teorico)*10000000000)/10000000000;
+  r.diferencia = diff;
+
+  if(r.real < r.salidas - TOL){
+    // Regla de negocio: si lo contado es menor a lo que el sistema dice que salió,
+    // parte de esa "salida" nunca se vendió — es MERMA, sin importar si el ajuste
+    // que hay que mandar a Microsip termine siendo Entrada o Salida.
+    r.etiqueta = 'MERMA';
+    const faltante = Math.round((r.salidas - r.real)*10000000000)/10000000000;
+    r.perdida = faltante;
+    r.montoMerma = (r.costoUnitario!=null) ? Math.round(faltante * r.costoUnitario * 100)/100 : null;
+    r.pista = 'Real menor a Salidas: parte de lo registrado como vendido no salió realmente — pérdida';
+  } else if(Math.abs(diff) <= TOL){
+    r.etiqueta = 'NO impacta'; r.montoMerma = 0; r.perdida = 0; r.pista = 'Diferencia despreciable';
+  } else if(diff < -TOL){
+    r.etiqueta = 'MERMA'; r.montoMerma = Math.round(Math.abs(diff)*100)/100; r.perdida = Math.abs(diff);
+    if(r.salidas>0 && r.entradas===0) r.pista = 'Faltante vs teórico; posible venta/salida no dada de baja total';
+    else if(r.salidas===0 && r.entradas===0) r.pista = 'Caducidad, rotura o merma física no registrada';
+    else r.pista = 'Revisar movimientos: bajas/mermas no registradas';
+  } else {
+    r.etiqueta = 'Ajuste ENTRADA'; r.montoMerma = 0; r.perdida = 0;
+    if(r.entradas>0 && r.salidas===0) r.pista = 'Sobrante vs teórico; posible entrada no registrada antes o sobreconteo previo';
+    else r.pista = 'Revisar recepciones/entradas no registradas o conteo';
+  }
+}
+
+function MrenderCaptureBody(st, filterQ){
+  const body = document.getElementById('mCaptureBody');
+  if(!body) return;
+  const capturables = MgetCapturables(st);
+  if(!capturables.length){
+    body.innerHTML = `<div class="callout warn">Ningún producto de este reporte tiene Salidas mayor a ${SALIDAS_UMBRAL} — no hay nada que recontar.</div>`;
+    return;
+  }
+  const capturados = capturables.filter(r=>r.real!==null).length;
+  const total = capturables.length;
+
+  if(st.captureMode==='tabla'){
+    let rows = capturables.slice();
+    if(filterQ) rows = rows.filter(r=>r.nombre.toUpperCase().includes(filterQ));
+    body.innerHTML = `
+      <div class="progress-bar"><div class="fill" style="width:${(capturados/total*100).toFixed(0)}%"></div></div>
+      <div class="scroll"><table>
+        <thead><tr><th>Producto</th><th>Clave</th><th class="num-cell">Salidas</th><th class="num-cell">Teórico</th><th class="num-cell">Pasillo</th><th class="num-cell">Bodega</th><th class="num-cell">Real</th><th class="num-cell">Dif. (Microsip)</th><th>Etiqueta</th><th class="num-cell">Pérdida (Sal.−Real)</th><th class="num-cell">Merma $</th></tr></thead>
+        <tbody>${rows.map(r=>{
+          const gi = st.productos.indexOf(r);
+          const rowClass = r.etiqueta==='MERMA' ? 'rowMerma' : r.etiqueta==='Ajuste ENTRADA' ? 'rowAjuste' : '';
+          return `<tr class="${rowClass}">
+            <td>${r.nombre}</td><td>${r.clave}</td>
+            <td class="num-cell" style="font-weight:700; color:var(--tomato); font-size:14px;">${fmtNum(r.salidas)}</td>
+            <td class="num-cell">${fmtNum(r.teorico)}</td>
+            <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="pasillo" class="mCampoInput" style="width:64px;" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></td>
+            <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="bodega" class="mCampoInput" style="width:64px;" value="${r.bodega===null?'':fmtNum(r.bodega)}"></td>
+            <td class="num-cell">${r.real===null?'':fmtNum(r.real)}</td>
+            <td class="num-cell">${r.diferencia===null?'':fmtNum(r.diferencia)}</td>
+            <td>${r.etiqueta?`<span class="pill ${r.etiqueta==='MERMA'?'tomato':r.etiqueta==='Ajuste ENTRADA'?'amber':'green'}">${r.etiqueta}</span>`:''}</td>
+            <td class="num-cell">${r.etiqueta==='MERMA' ? fmtNum(r.perdida) : ''}</td>
+            <td class="num-cell">${r.etiqueta==='MERMA' ? (r.montoMerma==null ? '<span class="pill amber">sin costo</span>' : '$'+fmtMoney(r.montoMerma)) : ''}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    `;
+    body.querySelectorAll('.mCampoInput').forEach((inp, pos)=>{
+      inp.addEventListener('change', (e)=>{ MsetCampo(st, parseInt(e.target.dataset.idx,10), e.target.dataset.campo, e.target.value); MrenderCaptureBody(st, filterQ); });
+      inp.addEventListener('keydown', (e)=>{
+        if(e.key==='Tab'){
+          e.preventDefault();
+          MsetCampo(st, parseInt(inp.dataset.idx,10), inp.dataset.campo, inp.value);
+          MrenderCaptureBody(st, filterQ);
+          const nuevos = document.querySelectorAll('.mCampoInput');
+          const destino = e.shiftKey ? nuevos[pos-1] : nuevos[pos+1];
+          if(destino){ destino.focus(); destino.select(); }
+        }
+      });
+    });
+    return;
+  }
+
+  const i = st.captureIndex;
+  const r = capturables[i];
+  const giReal = st.productos.indexOf(r);
+  const diffPreview = r.real===null ? null : Math.round((r.real - r.teorico)*10000000000)/10000000000;
+  body.innerHTML = `
+    <div class="progress-bar"><div class="fill" style="width:${((i+1)/total*100).toFixed(0)}%"></div></div>
+    <div class="capture">
+      <div style="text-align:center;">
+        <span class="clave-tag">CLAVE ${r.clave}</span>
+        <div class="nombre">${r.nombre}</div>
+        <div class="sistema">Teórico: ${fmtNum(r.teorico)} ${r.unidad||''} · Producto ${i+1} de ${total}</div>
+        <div style="font-family:'Inter', sans-serif; font-size:26px; font-weight:700; color:var(--tomato); margin-top:6px;">Salidas: ${fmtNum(r.salidas)}</div>
+      </div>
+      <div>
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;"><label class="f" style="text-align:center;">Pasillo</label><input type="text" inputmode="decimal" class="real" id="mPasilloBox" placeholder="0" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></div>
+          <div style="flex:1;"><label class="f" style="text-align:center;">Bodega</label><input type="text" inputmode="decimal" class="real" id="mBodegaBox" placeholder="0" value="${r.bodega===null?'':fmtNum(r.bodega)}"></div>
+        </div>
+        <div class="resta ${diffPreview>0?'neg':diffPreview<0?'pos':''}" id="mDiffPreview">${diffPreview===null?'&nbsp;':'DIFERENCIA: '+fmtNum(diffPreview)}</div>
+      </div>
+      <div class="navrow">
+        <button class="btn secondary" id="mBtnAnterior" ${i===0?'disabled':''}>← Anterior</button>
+        <button class="btn" id="mBtnSiguiente">${i===total-1?'Finalizar':'Siguiente →'}</button>
+      </div>
+    </div>
+  `;
+  const pasilloBox = document.getElementById('mPasilloBox');
+  const bodegaBox = document.getElementById('mBodegaBox');
+  const preview = document.getElementById('mDiffPreview');
+  pasilloBox.focus(); pasilloBox.select();
+  function livePreview(){
+    const p = parseNum(pasilloBox.value); const b = parseNum(bodegaBox.value);
+    if(isNaN(p) && isNaN(b)){ preview.innerHTML = '&nbsp;'; preview.className='resta'; return; }
+    const real = (isNaN(p)?0:p) + (isNaN(b)?0:b);
+    const diff = Math.round((real - r.teorico)*10000000000)/10000000000;
+    preview.textContent = 'DIFERENCIA: '+fmtNum(diff);
+    preview.className = 'resta ' + (diff>0?'neg':diff<0?'pos':'');
+  }
+  pasilloBox.addEventListener('input', livePreview);
+  bodegaBox.addEventListener('input', livePreview);
+  pasilloBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); MsetCampo(st, giReal, 'pasillo', pasilloBox.value); bodegaBox.focus(); bodegaBox.select(); } });
+  bodegaBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); goNext(); } });
+  document.getElementById('mBtnSiguiente').onclick = goNext;
+  document.getElementById('mBtnAnterior').onclick = ()=>{ guardarAmbos(); if(i>0){ st.captureIndex--; MrenderCaptureBody(st); } };
+  function guardarAmbos(){
+    MsetCampo(st, giReal, 'pasillo', pasilloBox.value);
+    MsetCampo(st, giReal, 'bodega', bodegaBox.value);
+  }
+  function goNext(){
+    guardarAmbos();
+    if(i < total-1){ st.captureIndex++; MrenderCaptureBody(st); }
+    else { st.maxStepReached = Math.max(st.maxStepReached, 3); MfinishBanner(st); }
+  }
+}
+function McomputeReal(r){
+  if(r.pasillo===null && r.bodega===null){ r.real = null; }
+  else { r.real = Math.round(((r.pasillo||0) + (r.bodega||0))*10000000000)/10000000000; }
+}
+function MsetCampo(st, idx, campo, val){
+  const r = st.productos[idx];
+  const v = parseNum(val);
+  r[campo] = (val==='' || val===null || isNaN(v)) ? null : v;
+  McomputeReal(r);
+  if(r.real===null){ r.diferencia = null; r.etiqueta = null; r.montoMerma = null; r.perdida = null; r.pista = null; }
+  else { Mrectificar(r); }
+}
+function MfinishBanner(st){
+  const body = document.getElementById('mCaptureBody');
+  const capturables = MgetCapturables(st);
+  const pendientes = capturables.filter(r=>r.real===null).length;
+  const merma = capturables.filter(r=>r.etiqueta==='MERMA').length;
+  const ajuste = capturables.filter(r=>r.etiqueta==='Ajuste ENTRADA').length;
+  const totalMermaAuto = capturables.reduce((s,r)=> s + (r.etiqueta==='MERMA' && r.montoMerma!=null ? r.montoMerma : 0), 0);
+  body.innerHTML = `
+    <div class="callout ${pendientes?'warn':''}">
+      ${pendientes ? `Quedan <b>${pendientes}</b> productos sin capturar.` : 'Terminaste de capturar todos los productos.'}
+      &nbsp; ${merma} MERMA (≈$${fmtMoney(totalMermaAuto)}) · ${ajuste} Ajuste ENTRADA.
+    </div>
+    <button class="btn secondary" id="mBtnRevisar">Revisar en tabla</button>
+    <button class="btn" id="mBtnACosteo">Ir a costeo de diferencias →</button>
+  `;
+  document.getElementById('mBtnRevisar').onclick = ()=>{ st.captureMode='tabla'; MrenderCaptureBody(st); };
+  document.getElementById('mBtnACosteo').onclick = ()=>{ st.step=3; render(); };
+}
+
+function MStep3(panel, st){
+  if(!st.productos.some(r=>r.real!==null)){ panel.innerHTML = `<div class="callout bad">Primero captura el inventario real en el paso 2.</div>`; return; }
+  const capturados = st.productos.filter(r=>r.real!==null);
+  const paraEntrada = capturados.filter(r=>r.diferencia > 0.0000000001);
+  panel.innerHTML = `
+    <div class="step-title"><h2>3. Costeo de diferencias</h2></div>
+    <p class="lead tag">Elige del reporte los artículos que a tu criterio generaron pérdida — el costo y las unidades ya salen calculados igual que en la captura del paso 2.</p>
+    <div class="toolbar">
+      <input type="text" id="mCosteoBuscador" placeholder="Filtrar por clave o nombre (opcional)..." style="min-width:260px;">
+    </div>
+    <div id="mCosteoResultados"></div>
+    <h3 style="margin-top:22px;">Artículos costeados</h3>
+    <div id="mCosteoTabla"></div>
+    <div class="stats-row" id="mCosteoTotal"></div>
+    <button class="btn secondary" id="mBtnDescargarCosteo">Descargar resumen (.xlsx)</button>
+
+    <h3 style="margin-top:30px;">Cerrar la rectificación en Microsip</h3>
+    <p class="lead tag">Las Salidas de lo que ya contaste las gestiona automáticamente el otro software conectado al ERP. Aquí solo generas la Entrada, para cuando Real quedó arriba del Teórico.</p>
+    <button class="btn" id="mBtnDescargarEntrada" ${!paraEntrada.length?'disabled':''}>Descargar Entrada_Rectificacion_${fechaHoy()}.xlsx (${paraEntrada.length})</button>
+  `;
+  const buscador = document.getElementById('mCosteoBuscador');
+  buscador.addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toUpperCase();
+    st.buscador = q;
+    MrenderCosteoResultados(st, q);
+  });
+  document.getElementById('mBtnDescargarCosteo').onclick = ()=>MdescargarCosteo(st);
+  document.getElementById('mBtnDescargarEntrada').onclick = ()=>{
+    const aoa = [[]];
+    paraEntrada.forEach(r=> aoa.push([r.clave, r.diferencia]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'Entrada_Rectificacion_'+fechaHoy()+'.xlsx');
+  };
+  MrenderCosteoResultados(st, st.buscador||'');
+  MrenderCosteoTabla(st);
+}
+
+function MrenderCosteoResultados(st, q){
+  const area = document.getElementById('mCosteoResultados');
+  if(!area) return;
+  const yaAgregados = new Set(st.costeo.map(c=>limpiaClave(c.clave)));
+  let results = st.productos.filter(p=>!yaAgregados.has(limpiaClave(p.clave)));
+  if(q) results = results.filter(p=> p.clave.toUpperCase().includes(q) || p.nombre.toUpperCase().includes(q));
+  results = results.slice().sort((a,b)=>b.salidas-a.salidas);
+  const mostrar = results.slice(0, 40);
+  if(!mostrar.length){ area.innerHTML = `<div class="callout">Sin resultados.</div>`; return; }
+  area.innerHTML = `
+    <div class="callout">Selecciona directamente del reporte — ordenado por Salidas, de mayor a menor. Tú decides cuáles generaron pérdida.</div>
+    <div class="scroll" style="max-height:320px;"><table>
+    <thead><tr><th>Producto</th><th>Clave</th><th class="num-cell">Salidas</th><th class="num-cell">Pérdida (uds.)</th><th>Etiqueta</th><th></th></tr></thead>
+    <tbody>${mostrar.map(p=>{
+      const gi = st.productos.indexOf(p);
+      const etTag = p.etiqueta ? `<span class="pill ${p.etiqueta==='MERMA'?'tomato':p.etiqueta==='Ajuste ENTRADA'?'amber':'green'}">${p.etiqueta}</span>` : '<span class="pill">sin capturar</span>';
+      return `<tr><td>${p.nombre}</td><td>${p.clave}</td><td class="num-cell">${fmtNum(p.salidas)}</td><td class="num-cell">${p.etiqueta==='MERMA' ? fmtNum(p.perdida) : ''}</td><td>${etTag}</td><td><button class="btn small" data-idx="${gi}">Agregar</button></td></tr>`;
+    }).join('')}</tbody>
+  </table></div>
+  ${results.length>mostrar.length ? `<div class="callout">Mostrando ${mostrar.length} de ${results.length} — usa el buscador para acotar.</div>` : ''}
+  `;
+  area.querySelectorAll('button[data-idx]').forEach(b=>{
+    b.onclick = ()=>{
+      const p = st.productos[parseInt(b.dataset.idx,10)];
+      MagregarCosteo(st, p);
+      MrenderCosteoResultados(st, st.buscador||'');
+      MrenderCosteoTabla(st);
+    };
+  });
+}
+
+function MagregarCosteo(st, p){
+  st.costeo.push({
+    clave: p.clave, nombre: p.nombre,
+    sinCapturar: p.real===null,
+    perdida: p.perdida!=null ? p.perdida : null,
+    costo: p.montoMerma!=null ? p.montoMerma : null,
+    sinCosto: p.real!==null && p.montoMerma==null
+  });
+}
+
+function MrenderCosteoTabla(st){
+  const tabla = document.getElementById('mCosteoTabla');
+  const totalArea = document.getElementById('mCosteoTotal');
+  if(!tabla) return;
+  if(!st.costeo.length){
+    tabla.innerHTML = `<div class="callout">Todavía no agregas artículos.</div>`;
+    if(totalArea) totalArea.innerHTML = '';
+    return;
+  }
+  const orden = st.costeo.map((c,i)=>i).sort((a,b)=> (st.costeo[b].perdida||0) - (st.costeo[a].perdida||0));
+  tabla.innerHTML = `<div class="scroll" style="max-height:260px;"><table>
+    <thead><tr><th>Clave</th><th>Producto</th><th class="num-cell">Unidades</th><th class="num-cell">Costo ($)</th><th></th></tr></thead>
+    <tbody>${orden.map(i=>{ const c = st.costeo[i]; return `
+      <tr class="${(c.sinCosto||c.sinCapturar)?'flag':''}">
+        <td>${c.clave}</td><td>${c.nombre}</td>
+        <td class="num-cell">${c.sinCapturar ? `<input type="text" class="mUnidadesManual" data-idx="${i}" style="width:70px;" placeholder="manual">` : fmtNum(c.perdida)}</td>
+        <td class="num-cell">${(c.sinCosto||c.sinCapturar) ? `<input type="text" class="mCostoManual" data-idx="${i}" style="width:90px;" placeholder="manual">` : '$'+fmtMoney(c.costo)}</td>
+        <td><button class="btn small danger" data-rm="${i}">Quitar</button></td>
+      </tr>
+    `; }).join('')}</tbody>
+  </table></div>
+  ${st.costeo.some(c=>c.sinCapturar) ? `<div class="callout warn">Los marcados en "sin capturar" no pasaron por el paso 2 (Salidas ≤ ${SALIDAS_UMBRAL} o no los tocaste) — captura ahí las unidades reales o ponlas a mano aquí.</div>` : ''}
+  `;
+  tabla.querySelectorAll('[data-rm]').forEach(b=>{
+    b.onclick = ()=>{ st.costeo.splice(parseInt(b.dataset.rm,10),1); MrenderCosteoTabla(st); };
+  });
+  tabla.querySelectorAll('.mCostoManual').forEach(inp=>{
+    inp.addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      const v = parseNum(e.target.value);
+      st.costeo[idx].costo = isNaN(v) ? null : v;
+      MrenderCosteoTabla(st);
+    });
+  });
+  tabla.querySelectorAll('.mUnidadesManual').forEach(inp=>{
+    inp.addEventListener('change', (e)=>{
+      const idx = parseInt(e.target.dataset.idx,10);
+      const v = parseNum(e.target.value);
+      st.costeo[idx].perdida = isNaN(v) ? null : v;
+      MrenderCosteoTabla(st);
+    });
+  });
+  const total = st.costeo.reduce((s,c)=> s + (c.costo||0), 0);
+  const totalUnidades = st.costeo.reduce((s,c)=> s + (c.perdida||0), 0);
+  const sinCostoCount = st.costeo.filter(c=>(c.sinCosto||c.sinCapturar) && c.costo==null).length;
+  totalArea.innerHTML = `
+    <div class="stat"><div class="n">$${fmtMoney(total)}</div><div class="l">total de merma en pesos</div></div>
+    <div class="stat"><div class="n">${fmtNum(totalUnidades)}</div><div class="l">unidades perdidas</div></div>
+    ${sinCostoCount ? `<div class="stat"><div class="n">${sinCostoCount}</div><div class="l">sin costo — captúralo a mano</div></div>` : ''}
+  `;
+}
+
+function MdescargarCosteo(st){
+  const aoa = [['Clave','Producto','Unidades','Costo']];
+  st.costeo.forEach(c=> aoa.push([c.clave, c.nombre, c.perdida||0, c.costo||0]));
+  const total = st.costeo.reduce((s,c)=> s + (c.costo||0), 0);
+  const totalUnidades = st.costeo.reduce((s,c)=> s + (c.perdida||0), 0);
+  aoa.push(['', 'TOTAL', totalUnidades, total]);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Costeo');
+  XLSX.writeFile(wb, 'Costeo_Diferencias_'+fechaHoy()+'.xlsx');
+}
+
+/* =====================================================================
+   PROCESO: NEGATIVOS
+   ===================================================================== */
+function renderNegativos(panel){
+  const st = state.negativos;
+  if(st.step===1) NStep1(panel, st);
+  if(st.step===2) NStep2(panel, st);
+  if(st.step===3) NStep3(panel, st);
+}
+
+/* ---- parseo del reporte "Existencia y valor del inventario — solo artículos con existencia negativa" ----
+   Formato Microsip con celdas combinadas — las columnas se detectan solas leyendo los encabezados,
+   igual que en el proceso del miércoles.
+   Viene agrupado por "Línea: ..." y con renglones de subtotal ("N artículos en X", "N artículos con existencia negativa",
+   "Total N artículos") que hay que ignorar.
+*/
+function NparseReporte(rows){
+  let headerRow = -1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const a = String(rows[i][0]||'').trim().toLowerCase();
+    if(a==='artículo' || a==='articulo'){ headerRow = i; break; }
+  }
+  if(headerRow<0) headerRow = 6;
+
+  const hdr = rows[headerRow] || [];
+  function buscarCol(regex, fallback){
+    for(let i=0;i<hdr.length;i++){ if(hdr[i] && regex.test(String(hdr[i]))) return i; }
+    return fallback;
+  }
+  const unidadCol = buscarCol(/^u\.?\s*med/i, 7);
+  const existenciaCol = buscarCol(/^existencia/i, 11);
+  const SKIP = /^(\d+\s+art[íi]culos|total\s+\d+\s+art[íi]culos)/i;
+  const LINEA = /^l[ií]nea/i;
+
+  let nombreCol = 1;
+  for(let i=headerRow+1; i<rows.length; i++){
+    const a = rows[i][0];
+    if(a===undefined || a===null || String(a).trim()==='') continue;
+    const aTxt = String(a).trim();
+    if(LINEA.test(aTxt) || SKIP.test(aTxt)) continue;
+    const r = rows[i];
+    for(let ci=1; ci<unidadCol; ci++){
+      if(r[ci]!==undefined && r[ci]!==null && r[ci]!==''){ nombreCol = ci; break; }
+    }
+    break;
+  }
+
+  const productos = [];
+  let lineaActual = '';
+  for(let i=headerRow+1; i<rows.length; i++){
+    const r = rows[i];
+    const a = r[0];
+    if(a===undefined || a===null || String(a).trim()==='') continue;
+    const aTxt = String(a).trim();
+    if(LINEA.test(aTxt)){ lineaActual = aTxt.replace(/^l[ií]nea:?\s*/i,''); continue; }
+    if(SKIP.test(aTxt)) continue;
+    const nombre = r[nombreCol]!==undefined ? r[nombreCol] : '';
+    const unidad = r[unidadCol];
+    const existencia = parseNum(r[existenciaCol]);
+    productos.push({
+      clave: aTxt, nombre: String(nombre||'').trim(), unidad, linea: lineaActual,
+      existencia: isNaN(existencia)?0:existencia,
+      pasillo:null, bodega:null, real:null, entrada:null
+    });
+  }
+  return productos;
+}
+
+function NStep1(panel, st){
+  panel.innerHTML = `
+    <div class="step-title"><h2>1. Cargar reporte de negativos</h2></div>
+    <p class="lead tag">En Microsip: Existencia y valor del inventario → filtrar "Solo artículos con existencia negativa" (todas las líneas).</p>
+    <div class="callout">Sube aquí ese reporte (.xlsx / .xls).</div>
+    <input type="file" id="nFileInput" accept=".xlsx,.xls,.xlsm">
+    <div id="nParseArea"></div>
+  `;
+  document.getElementById('nFileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    readWorkbookRows(file, (rows)=>{
+      st.productos = NparseReporte(rows);
+      st.maxStepReached = Math.max(st.maxStepReached, 2);
+      NrenderParseSummary(st);
+    });
+  });
+  if(st.productos.length) NrenderParseSummary(st);
+}
+
+function NrenderParseSummary(st){
+  const area = document.getElementById('nParseArea');
+  if(!area) return;
+  area.innerHTML = `
+    <div class="stats-row"><div class="stat"><div class="n">${st.productos.length}</div><div class="l">artículos con existencia negativa</div></div></div>
+    <button class="btn" id="nBtnToStep2">Continuar a captura →</button>
+  `;
+  document.getElementById('nBtnToStep2').onclick = ()=>{ st.step=2; st.maxStepReached = Math.max(st.maxStepReached,3); render(); };
+}
+
+function NgetOrdenados(st){ return st.productos.slice(); }
+
+function NStep2(panel, st){
+  if(!st.productos.length){ panel.innerHTML = `<div class="callout bad">Primero carga el reporte en el paso 1.</div>`; return; }
+  panel.innerHTML = `
+    <div class="step-title"><h2>2. Captura de existencia real</h2></div>
+    <p class="lead tag">Como el sistema ya está en negativo, siempre se genera una Entrada = Real − Existencia (del sistema). Si no lo encuentras, captura 0.</p>
+    <div class="toolbar">
+      <button class="btn secondary small" id="nBtnModeStepper">Uno por uno</button>
+      <button class="btn secondary small" id="nBtnModeTabla">Vista de tabla</button>
+      <div class="spacer"></div>
+      <input type="text" id="nBuscador" placeholder="Buscar producto..." style="min-width:180px;">
+      <button class="btn small" id="nBtnFinalizarYa">Finalizar aquí y generar archivo →</button>
+    </div>
+    <div id="nCaptureBody"></div>
+  `;
+  document.getElementById('nBtnFinalizarYa').onclick = ()=>{ st.step=3; render(); };
+  document.getElementById('nBtnModeStepper').onclick = ()=>{ st.captureMode='stepper'; NrenderCaptureBody(st); };
+  document.getElementById('nBtnModeTabla').onclick = ()=>{ st.captureMode='tabla'; NrenderCaptureBody(st); };
+  document.getElementById('nBuscador').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toUpperCase();
+    if(!q) return;
+    if(st.captureMode==='stepper'){
+      const idx = NgetOrdenados(st).findIndex(r=>r.nombre.toUpperCase().includes(q));
+      if(idx>=0){ st.captureIndex = idx; NrenderCaptureBody(st); }
+    } else { NrenderCaptureBody(st, q); }
+  });
+  NrenderCaptureBody(st);
+}
+
+function NcomputeReal(r){
+  if(r.pasillo===null && r.bodega===null){ r.real = null; }
+  else { r.real = Math.round(((r.pasillo||0) + (r.bodega||0))*10000000000)/10000000000; }
+}
+function NsetCampo(st, idx, campo, val){
+  const r = st.productos[idx];
+  const v = parseNum(val);
+  r[campo] = (val==='' || val===null || isNaN(v)) ? null : v;
+  NcomputeReal(r);
+  r.entrada = r.real===null ? null : Math.round((r.real - r.existencia)*10000000000)/10000000000;
+}
+
+function NrenderCaptureBody(st, filterQ){
+  const body = document.getElementById('nCaptureBody');
+  if(!body) return;
+  const ordenados = NgetOrdenados(st);
+  const capturados = st.productos.filter(r=>r.real!==null).length;
+  const total = st.productos.length;
+
+  if(st.captureMode==='tabla'){
+    let rows = ordenados;
+    if(filterQ) rows = rows.filter(r=>r.nombre.toUpperCase().includes(filterQ));
+    let lineaAnterior = null;
+    const filas = [];
+    rows.forEach(r=>{
+      if(r.linea !== lineaAnterior){
+        filas.push(`<tr><td colspan="6" style="background:var(--green-pale); color:var(--green-deep); font-weight:700; padding:6px 10px;">${r.linea || 'Sin línea'}</td></tr>`);
+        lineaAnterior = r.linea;
+      }
+      const gi = st.productos.indexOf(r);
+      filas.push(`<tr>
+        <td>${r.nombre}</td><td>${r.clave}</td>
+        <td class="num-cell" style="color:var(--tomato); font-weight:700;">${fmtNum(r.existencia)}</td>
+        <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="pasillo" class="nCampoInput" style="width:64px;" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></td>
+        <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="bodega" class="nCampoInput" style="width:64px;" value="${r.bodega===null?'':fmtNum(r.bodega)}"></td>
+        <td class="num-cell">${r.entrada===null?'':fmtNum(r.entrada)}</td>
+      </tr>`);
+    });
+    body.innerHTML = `
+      <div class="progress-bar"><div class="fill" style="width:${(capturados/total*100).toFixed(0)}%"></div></div>
+      <div class="scroll"><table>
+        <thead><tr><th>Producto</th><th>Clave</th><th class="num-cell">Existencia</th><th class="num-cell">Pasillo</th><th class="num-cell">Bodega</th><th class="num-cell">Entrada</th></tr></thead>
+        <tbody>${filas.join('')}</tbody>
+      </table></div>
+    `;
+    body.querySelectorAll('.nCampoInput').forEach((inp, pos)=>{
+      inp.addEventListener('change', (e)=>{ NsetCampo(st, parseInt(e.target.dataset.idx,10), e.target.dataset.campo, e.target.value); NrenderCaptureBody(st, filterQ); });
+      inp.addEventListener('keydown', (e)=>{
+        if(e.key==='Tab'){
+          e.preventDefault();
+          NsetCampo(st, parseInt(inp.dataset.idx,10), inp.dataset.campo, inp.value);
+          NrenderCaptureBody(st, filterQ);
+          const nuevos = document.querySelectorAll('.nCampoInput');
+          const destino = e.shiftKey ? nuevos[pos-1] : nuevos[pos+1];
+          if(destino){ destino.focus(); destino.select(); }
+        }
+      });
+    });
+    return;
+  }
+
+  const i = st.captureIndex;
+  const r = ordenados[i];
+  const giReal = st.productos.indexOf(r);
+  const entradaPreview = r.real===null ? null : Math.round((r.real - r.existencia)*10000000000)/10000000000;
+  body.innerHTML = `
+    <div class="progress-bar"><div class="fill" style="width:${((i+1)/total*100).toFixed(0)}%"></div></div>
+    <div class="capture">
+      <div style="text-align:center;">
+        <span class="clave-tag">CLAVE ${r.clave}</span>
+        <div class="nombre">${r.nombre}</div>
+        <div class="sistema">${r.linea?r.linea+' · ':''}Producto ${i+1} de ${total}</div>
+        <div style="font-family:'Inter', sans-serif; font-size:26px; font-weight:700; color:var(--tomato); margin-top:6px;">Existencia: ${fmtNum(r.existencia)}</div>
+      </div>
+      <div>
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;"><label class="f" style="text-align:center;">Pasillo</label><input type="text" inputmode="decimal" class="real" id="nPasilloBox" placeholder="0" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></div>
+          <div style="flex:1;"><label class="f" style="text-align:center;">Bodega</label><input type="text" inputmode="decimal" class="real" id="nBodegaBox" placeholder="0" value="${r.bodega===null?'':fmtNum(r.bodega)}"></div>
+        </div>
+        <div class="resta neg" id="nEntradaPreview">${entradaPreview===null?'&nbsp;':'ENTRADA: '+fmtNum(entradaPreview)}</div>
+      </div>
+      <div class="navrow">
+        <button class="btn secondary" id="nBtnAnterior" ${i===0?'disabled':''}>← Anterior</button>
+        <button class="btn" id="nBtnSiguiente">${i===total-1?'Finalizar':'Siguiente →'}</button>
+      </div>
+    </div>
+  `;
+  const pasilloBox = document.getElementById('nPasilloBox');
+  const bodegaBox = document.getElementById('nBodegaBox');
+  const preview = document.getElementById('nEntradaPreview');
+  pasilloBox.focus(); pasilloBox.select();
+  function livePreview(){
+    const p = parseNum(pasilloBox.value); const b = parseNum(bodegaBox.value);
+    if(isNaN(p) && isNaN(b)){ preview.innerHTML = '&nbsp;'; return; }
+    const real = (isNaN(p)?0:p) + (isNaN(b)?0:b);
+    preview.textContent = 'ENTRADA: '+fmtNum(Math.round((real - r.existencia)*10000000000)/10000000000);
+  }
+  pasilloBox.addEventListener('input', livePreview);
+  bodegaBox.addEventListener('input', livePreview);
+  pasilloBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); NsetCampo(st, giReal, 'pasillo', pasilloBox.value); bodegaBox.focus(); bodegaBox.select(); } });
+  bodegaBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); goNext(); } });
+  document.getElementById('nBtnSiguiente').onclick = goNext;
+  document.getElementById('nBtnAnterior').onclick = ()=>{ guardarAmbos(); if(i>0){ st.captureIndex--; NrenderCaptureBody(st); } };
+  function guardarAmbos(){
+    NsetCampo(st, giReal, 'pasillo', pasilloBox.value);
+    NsetCampo(st, giReal, 'bodega', bodegaBox.value);
+  }
+  function goNext(){
+    guardarAmbos();
+    if(i < total-1){ st.captureIndex++; NrenderCaptureBody(st); }
+    else { st.maxStepReached = Math.max(st.maxStepReached, 3); NfinishBanner(st); }
+  }
+}
+
+function NfinishBanner(st){
+  const body = document.getElementById('nCaptureBody');
+  const pendientes = st.productos.filter(r=>r.real===null).length;
+  body.innerHTML = `
+    <div class="callout ${pendientes?'warn':''}">${pendientes ? `Quedan <b>${pendientes}</b> productos sin capturar — no se incluirán en el archivo.` : 'Terminaste de capturar todos los productos.'}</div>
+    <button class="btn secondary" id="nBtnRevisar">Revisar en tabla</button>
+    <button class="btn" id="nBtnAGenerar">Ir a generar archivo →</button>
+  `;
+  document.getElementById('nBtnRevisar').onclick = ()=>{ st.captureMode='tabla'; NrenderCaptureBody(st); };
+  document.getElementById('nBtnAGenerar').onclick = ()=>{ st.step=3; render(); };
+}
+
+function NStep3(panel, st){
+  const capturados = st.productos.filter(r=>r.real!==null);
+  const pendientes = st.productos.length - capturados.length;
+  const entradas = capturados.filter(r=>Math.abs(r.entrada) > 0.0000000001);
+  panel.innerHTML = `
+    <div class="step-title"><h2>3. Generar archivo de Entradas</h2></div>
+    <p class="lead tag">Entrada = Real − Existencia del sistema (que ya estaba en negativo).</p>
+    ${pendientes ? `<div class="callout warn">${pendientes} productos sin capturar quedaron fuera del archivo.</div>` : ''}
+    <div class="stats-row"><div class="stat"><div class="n">${entradas.length}</div><div class="l">artículos para Entrada_Negativos</div></div></div>
+    <button class="btn" id="nBtnDescargar" ${!entradas.length?'disabled':''}>Descargar Entrada_Negativos_${fechaHoy()}.xlsx</button>
+    <div class="scroll" style="margin-top:12px; max-height:280px;"><table>
+      <thead><tr><th>Clave</th><th>Producto</th><th class="num-cell">Cant.</th></tr></thead>
+      <tbody>${entradas.map(r=>`<tr><td>${r.clave}</td><td>${r.nombre}</td><td class="num-cell">${fmtNum(r.entrada)}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="callout">Importa este archivo en Microsip como Entrada de inventario, igual que ya lo haces con Entrada_Negativos.</div>
+  `;
+  document.getElementById('nBtnDescargar').onclick = ()=>{
+    const aoa = [[]];
+    entradas.forEach(r=> aoa.push([r.clave, r.entrada]));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    XLSX.writeFile(wb, 'Entrada_Negativos_'+fechaHoy()+'.xlsx');
+  };
+}
+
+/* =====================================================================
+   PROCESO: MERMAS DE TARIMA
+   ===================================================================== */
+function renderTarima(panel){
+  const st = state.tarima;
+  const label = t => t==='DAÑO' ? 'DAÑO' : 'CADUCIDAD';
+
+  panel.innerHTML = `
+    <div class="step-title"><h2>Mermas de Tarima</h2></div>
+    <p class="lead tag">Escanea el código, digita la cantidad y Enter para pasar al siguiente. Tab cambia entre Daño y Caducidad.</p>
+    <div class="toolbar" style="gap:10px;">
+      <button class="btn ${st.tablaActual==='DAÑO'?'':'secondary'}" id="tBtnDano" style="flex:1;">DAÑO</button>
+      <button class="btn ${st.tablaActual==='CADUCIDAD'?'':'secondary'}" id="tBtnCaducidad" style="flex:1;">CADUCIDAD</button>
+    </div>
+    <div class="capture" style="max-width:420px;">
+      <div>
+        <label class="f">Código de barras — tabla activa: ${label(st.tablaActual)}</label>
+        <input type="text" id="tBarcodeInput" class="real" style="font-size:22px;" placeholder="Escanea aquí" autocomplete="off">
+      </div>
+      <div>
+        <label class="f">Cantidad</label>
+        <input type="text" id="tCantidadInput" class="real" inputmode="numeric" value="1">
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:26px;">
+      <div>
+        <h3 style="font-size:15px;">DAÑO <span class="pill tomato" id="tDanoCount"></span></h3>
+        <div class="scroll" id="tDanoList" style="max-height:240px;"></div>
+        <button class="btn secondary small" id="tBtnDescargarDano" style="margin-top:8px;">Descargar DAÑO_${fechaHoy()}.xlsx</button>
+      </div>
+      <div>
+        <h3 style="font-size:15px;">CADUCIDAD <span class="pill amber" id="tCaducidadCount"></span></h3>
+        <div class="scroll" id="tCaducidadList" style="max-height:240px;"></div>
+        <button class="btn secondary small" id="tBtnDescargarCaducidad" style="margin-top:8px;">Descargar CADUCIDAD_${fechaHoy()}.xlsx</button>
+      </div>
+    </div>
+  `;
+
+  const barcodeInput = document.getElementById('tBarcodeInput');
+  const cantidadInput = document.getElementById('tCantidadInput');
+
+  function setTabla(t){
+    st.tablaActual = t;
+    document.getElementById('tBtnDano').className = 'btn' + (t==='DAÑO' ? '' : ' secondary');
+    document.getElementById('tBtnCaducidad').className = 'btn' + (t==='CADUCIDAD' ? '' : ' secondary');
+    document.querySelectorAll('.capture label.f')[0].textContent = 'Código de barras — tabla activa: ' + label(t);
+    barcodeInput.focus();
+  }
+  document.getElementById('tBtnDano').onclick = ()=>setTabla('DAÑO');
+  document.getElementById('tBtnCaducidad').onclick = ()=>setTabla('CADUCIDAD');
+
+  barcodeInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Tab'){ e.preventDefault(); setTabla(st.tablaActual==='DAÑO'?'CADUCIDAD':'DAÑO'); return; }
+    if(e.key==='Enter'){
+      e.preventDefault();
+      if(barcodeInput.value.trim()==='') return;
+      cantidadInput.value='1';
+      cantidadInput.focus();
+      cantidadInput.select();
+    }
+  });
+  cantidadInput.addEventListener('keydown', (e)=>{
+    if(e.key==='Tab'){ e.preventDefault(); setTabla(st.tablaActual==='DAÑO'?'CADUCIDAD':'DAÑO'); return; }
+    if(e.key==='Enter'){
+      e.preventDefault();
+      const clave = barcodeInput.value.trim();
+      const cant = parseNum(cantidadInput.value);
+      if(clave==='' || isNaN(cant)) return;
+      const arr = st.tablaActual==='DAÑO' ? st.dano : st.caducidad;
+      arr.push({clave, cantidad:cant});
+      barcodeInput.value=''; cantidadInput.value='';
+      TupdateLists(st);
+      barcodeInput.focus();
+    }
+  });
+
+  document.getElementById('tBtnDescargarDano').onclick = ()=>Tdescargar('DAÑO', st.dano);
+  document.getElementById('tBtnDescargarCaducidad').onclick = ()=>Tdescargar('CADUCIDAD', st.caducidad);
+
+  TupdateLists(st);
+  barcodeInput.focus();
+}
+
+function TrowsHtml(arr){
+  if(!arr.length) return `<div class="callout">Sin artículos todavía.</div>`;
+  return `<table><tbody>${arr.map((r,i)=>`<tr><td>${r.clave}</td><td class="num-cell">${fmtNum(r.cantidad)}</td><td><button class="btn small danger" data-rm="${i}">✕</button></td></tr>`).join('')}</tbody></table>`;
+}
+function TupdateLists(st){
+  const danoList = document.getElementById('tDanoList');
+  const caducidadList = document.getElementById('tCaducidadList');
+  if(!danoList) return;
+  document.getElementById('tDanoCount').textContent = st.dano.length;
+  document.getElementById('tCaducidadCount').textContent = st.caducidad.length;
+  danoList.innerHTML = TrowsHtml(st.dano);
+  caducidadList.innerHTML = TrowsHtml(st.caducidad);
+  danoList.querySelectorAll('[data-rm]').forEach(b=>{
+    b.onclick = ()=>{ st.dano.splice(parseInt(b.dataset.rm,10),1); TupdateLists(st); };
+  });
+  caducidadList.querySelectorAll('[data-rm]').forEach(b=>{
+    b.onclick = ()=>{ st.caducidad.splice(parseInt(b.dataset.rm,10),1); TupdateLists(st); };
+  });
+}
+function Tdescargar(labelTxt, arr){
+  if(!arr.length) return;
+  const aoa = [[labelTxt]];
+  arr.forEach(r=> aoa.push([r.clave, r.cantidad]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+  XLSX.writeFile(wb, labelTxt+'_'+fechaHoy()+'.xlsx');
+}
+
+/* =====================================================================
+   PROCESO: ANÁLISIS DE MERMAS (mensual — Daño y Caducidad)
+   ===================================================================== */
+const __charts = {};
+
+/* ---- parseo del reporte "Relaciones del inventario" filtrado por Concepto ----
+   Formato: Clave(A), Nombre(offset+2), U.med, Unidades, Costo unitario, Costo total.
+   Trae una fila de total al final ("Total N artículos") que se ignora.
+*/
+function AparseMerma(rows){
+  let headerRow=-1, claveCol=0;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    for(let c=0;c<rows[i].length;c++){
+      const v = String(rows[i][c]||'').trim().toLowerCase();
+      if(v==='artículo' || v==='articulo'){ headerRow=i; claveCol=c; break; }
+    }
+    if(headerRow>=0) break;
+  }
+  if(headerRow<0){ headerRow=5; claveCol=0; }
+  const header = rows[headerRow];
+  function findCol(regex){
+    for(let c=0;c<header.length;c++){ if(regex.test(String(header[c]||'').trim())) return c; }
+    return -1;
+  }
+  const unidadCol = findCol(/^u\.?\s*med/i);
+  const unidadesCol = findCol(/^unidades$/i);
+  const costoUnitCol = findCol(/costo\s*unitario/i);
+  const costoTotalCol = findCol(/costo\s*total/i);
+  const SKIP = /^(\d+\s+art[íi]culos|total\s+\d+\s+art[íi]culos)/i;
+
+  const productos = [];
+  for(let i=headerRow+1; i<rows.length; i++){
+    const r = rows[i];
+    const clave = r[claveCol];
+    if(clave===undefined || clave===null || String(clave).trim()==='') continue;
+    const claveTxt = String(clave).trim();
+    if(SKIP.test(claveTxt)) continue;
+    let nombre='';
+    for(let c=claveCol+1; c<unidadCol; c++){
+      const v = r[c];
+      if(v!==undefined && v!==null && String(v).trim()!==''){ nombre=String(v).trim(); break; }
+    }
+    const unidades = parseNum(r[unidadesCol]);
+    const costoUnit = parseNum(r[costoUnitCol]);
+    const costoTotal = parseNum(r[costoTotalCol]);
+    productos.push({
+      clave: claveTxt, nombre,
+      unidades: isNaN(unidades)?0:unidades,
+      costoUnit: isNaN(costoUnit)?0:costoUnit,
+      costoTotal: isNaN(costoTotal)?0:costoTotal
+    });
+  }
+  const totalCosto = productos.reduce((s,p)=>s+p.costoTotal,0);
+  const totalUnidades = productos.reduce((s,p)=>s+p.unidades,0);
+  return {productos, totalCosto, totalUnidades};
+}
+
+function renderAnalisis(panel){
+  const st = state.analisis;
+  panel.innerHTML = `
+    <div class="step-title"><h2>Análisis de Mermas (mensual)</h2></div>
+    <p class="lead tag">Sube los reportes de "Relaciones del inventario" filtrados por Concepto (Merma caducidad / Merma daño) del periodo que quieras analizar.</p>
+    <div class="grid2">
+      <div>
+        <label class="f">Reporte de Merma Caducidad</label>
+        <input type="file" id="aFileCaducidad" accept=".xlsx,.xls,.xlsm">
+      </div>
+      <div>
+        <label class="f">Reporte de Merma Daño</label>
+        <input type="file" id="aFileDano" accept=".xlsx,.xls,.xlsm">
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:14px;">
+      <label class="f" style="margin:0;">Mostrar top</label>
+      <select id="aTopN" style="width:80px;">
+        <option value="5">5</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+    <div id="aResultados" style="margin-top:20px;"></div>
+  `;
+  document.getElementById('aTopN').value = st.topN;
+  document.getElementById('aFileCaducidad').addEventListener('change', (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    readWorkbookRows(file, (rows)=>{ st.caducidad = AparseMerma(rows); ArenderResultados(st); });
+  });
+  document.getElementById('aFileDano').addEventListener('change', (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    readWorkbookRows(file, (rows)=>{ st.dano = AparseMerma(rows); ArenderResultados(st); });
+  });
+  document.getElementById('aTopN').addEventListener('change', (e)=>{
+    st.topN = parseInt(e.target.value,10);
+    ArenderResultados(st);
+  });
+  ArenderResultados(st);
+}
+
+function ArenderResultados(st){
+  const area = document.getElementById('aResultados');
+  if(!area) return;
+  if(!st.caducidad && !st.dano){
+    area.innerHTML = `<div class="callout">Sube al menos uno de los dos reportes para ver el análisis.</div>`;
+    return;
+  }
+  area.innerHTML = `
+    <div id="aBloqueCaducidad"></div>
+    <div id="aBloqueDano" style="margin-top:34px;"></div>
+    <div id="aBloqueDescarga" style="margin-top:24px;"></div>
+  `;
+  if(st.caducidad) ArenderBloque('aBloqueCaducidad', 'MERMA CADUCIDAD', 'chartCaducidad', st.caducidad, st.topN, 'tomato');
+  else document.getElementById('aBloqueCaducidad').innerHTML = `<div class="callout">Sube el reporte de Caducidad para verlo aquí.</div>`;
+  if(st.dano) ArenderBloque('aBloqueDano', 'MERMA DAÑO', 'chartDano', st.dano, st.topN, 'amber');
+  else document.getElementById('aBloqueDano').innerHTML = `<div class="callout">Sube el reporte de Daño para verlo aquí.</div>`;
+
+  if(st.caducidad || st.dano){
+    document.getElementById('aBloqueDescarga').innerHTML = `<button class="btn secondary" id="aBtnDescargar">Descargar resumen (.xlsx)</button>`;
+    document.getElementById('aBtnDescargar').onclick = ()=>AdescargarResumen(st);
+  }
+}
+
+function AtopYVarios(datos, topN){
+  const ordenados = datos.productos.slice().sort((a,b)=>b.costoTotal-a.costoTotal);
+  const top = ordenados.slice(0, topN);
+  const topCosto = top.reduce((s,p)=>s+p.costoTotal,0);
+  const topUnidades = top.reduce((s,p)=>s+p.unidades,0);
+  const variosCosto = Math.round((datos.totalCosto - topCosto)*100)/100;
+  const variosUnidades = Math.round((datos.totalUnidades - topUnidades)*10000000000)/10000000000;
+  const restoCount = datos.productos.length - top.length;
+  return {top, variosCosto, variosUnidades, restoCount};
+}
+
+function ArenderBloque(containerId, titulo, chartId, datos, topN, colorVar){
+  const cont = document.getElementById(containerId);
+  const {top, variosCosto, variosUnidades, restoCount} = AtopYVarios(datos, topN);
+  cont.innerHTML = `
+    <h3>${titulo}</h3>
+    <div class="stats-row">
+      <div class="stat"><div class="n">$${fmtMoney(datos.totalCosto)}</div><div class="l">costo total del periodo</div></div>
+      <div class="stat"><div class="n">${fmtNum(datos.totalUnidades)}</div><div class="l">unidades totales</div></div>
+      <div class="stat"><div class="n">${datos.productos.length}</div><div class="l">artículos distintos</div></div>
+    </div>
+    <div style="max-width:720px; margin:16px 0;"><canvas id="${chartId}" height="90"></canvas></div>
+    <div class="scroll" style="max-height:280px;"><table>
+      <thead><tr><th>#</th><th>Clave</th><th>Producto</th><th class="num-cell">Unidades</th><th class="num-cell">Costo</th></tr></thead>
+      <tbody>
+        ${top.map((p,i)=>`<tr><td>${i+1}</td><td>${p.clave}</td><td>${p.nombre}</td><td class="num-cell">${fmtNum(p.unidades)}</td><td class="num-cell">$${fmtMoney(p.costoTotal)}</td></tr>`).join('')}
+        <tr><td></td><td></td><td><b>VARIOS</b> (${restoCount} artículos)</td><td class="num-cell">${fmtNum(variosUnidades)}</td><td class="num-cell">$${fmtMoney(variosCosto)}</td></tr>
+      </tbody>
+    </table></div>
+  `;
+  ApintarChart(chartId, titulo, top, variosCosto, datos.totalCosto, colorVar);
+}
+
+function ApintarChart(chartId, titulo, top, variosCosto, totalCosto, colorVar){
+  const canvas = document.getElementById(chartId);
+  if(!canvas || typeof Chart==='undefined') return;
+  if(__charts[chartId]){ __charts[chartId].destroy(); }
+  const labels = top.map(p=> p.nombre.length>22 ? p.nombre.slice(0,22)+'…' : p.nombre).concat(['VARIOS']);
+  const costos = top.map(p=>p.costoTotal).concat([variosCosto]);
+  let acumulado = 0;
+  const cumPct = costos.map(c=>{ acumulado += c; return totalCosto>0 ? Math.round((acumulado/totalCosto)*1000)/10 : 0; });
+  const barColor = colorVar==='tomato' ? '#E0583F' : '#F2994A';
+  __charts[chartId] = new Chart(canvas.getContext('2d'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'Costo', data: costos, backgroundColor: barColor, yAxisID:'y', order:2 },
+        { type:'line', label:'% acumulado', data: cumPct, borderColor:'#1B4332', backgroundColor:'#1B4332', yAxisID:'y1', tension:0.25, order:1, pointRadius:3 }
+      ]
+    },
+    options: {
+      responsive:true,
+      plugins:{ title:{ display:true, text: titulo }, legend:{ position:'bottom' } },
+      scales:{
+        y:{ beginAtZero:true, title:{ display:true, text:'Costo ($)' } },
+        y1:{ beginAtZero:true, max:100, position:'right', grid:{ drawOnChartArea:false }, title:{ display:true, text:'% acumulado' } }
+      }
+    }
+  });
+}
+
+function AdescargarResumen(st){
+  const aoa = [];
+  const periodoTxt = 'Reporte de Merma Caducidad y Merma Daño — generado ' + fechaHoy();
+  aoa.push([periodoTxt]);
+  aoa.push([]);
+
+  ['caducidad','dano'].forEach(key=>{
+    const datos = st[key];
+    if(!datos) return;
+    const {top, variosCosto, variosUnidades, restoCount} = AtopYVarios(datos, st.topN);
+    const costoSumado = Math.round(top.reduce((s,p)=>s+p.costoTotal,0)*100)/100;
+    const titulo = (key==='caducidad' ? 'Mermas Caducidad TOP ' : 'Mermas Daño TOP ') + st.topN;
+
+    aoa.push([titulo]);
+    aoa.push(['Codigo','Nombre','Costo','Costo Sumado','Cantidad']);
+    top.forEach(p=> aoa.push([p.clave, p.nombre, p.costoTotal, costoSumado, p.unidades]));
+    aoa.push(['', 'VARIOS ('+restoCount+' artículos)', variosCosto, costoSumado, variosUnidades]);
+    aoa.push([]);
+    aoa.push(['', '', '', '', datos.totalUnidades]);
+    // espacio en blanco reservado para insertar la gráfica de Excel (Pareto), igual que en tu plantilla
+    for(let i=0;i<10;i++) aoa.push([]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{wch:16},{wch:40},{wch:12},{wch:14},{wch:10}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Analisis Mermas');
+  XLSX.writeFile(wb, 'Analisis_Mermas_'+fechaHoy()+'.xlsx');
+}
+
+/* =====================================================================
+   PROCESO: INVENTARIO MENSUAL (SAM'S, USA, WALMART, o cualquier otro)
+   ===================================================================== */
+function ZparseReporte(rows){
+  let headerRow=-1, claveCol=0;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    for(let c=0;c<rows[i].length;c++){
+      const v = String(rows[i][c]||'').trim().toLowerCase();
+      if(v==='artículo' || v==='articulo'){ headerRow=i; claveCol=c; break; }
+    }
+    if(headerRow>=0) break;
+  }
+  if(headerRow<0){ headerRow=6; claveCol=0; }
+  const header = rows[headerRow];
+  function findCol(regex){
+    for(let c=0;c<header.length;c++){ if(regex.test(String(header[c]||'').trim())) return c; }
+    return -1;
+  }
+  const unidadCol = findCol(/^u\.?\s*med/i);
+  let existCol = findCol(/^existencia$/i);
+  if(existCol<0) existCol = findCol(/exist/i);
+  if(existCol<0) existCol = claveCol+5;
+  const uCol = unidadCol<0 ? claveCol+2 : unidadCol;
+
+  const SKIP = /^(\d+\s+art[íi]culos|total\s+\d+\s+art[íi]culos)/i;
+  const LINEA = /^l[ií]nea/i;
+  const productos = [];
+  let lineaActual = '';
+  for(let i=headerRow+1; i<rows.length; i++){
+    const r = rows[i];
+    const a = r[claveCol];
+    if(a===undefined || a===null || String(a).trim()==='') continue;
+    const aTxt = String(a).trim();
+    if(LINEA.test(aTxt)){ lineaActual = aTxt.replace(/^l[ií]nea:?\s*/i,''); continue; }
+    if(SKIP.test(aTxt)) continue;
+    let nombre='';
+    for(let c=claveCol+1; c<uCol; c++){
+      const v = r[c];
+      if(v!==undefined && v!==null && String(v).trim()!==''){ nombre=String(v).trim(); break; }
+    }
+    const unidad = r[uCol];
+    const existencia = parseNum(r[existCol]);
+    productos.push({
+      clave: aTxt, nombre, unidad, linea: lineaActual,
+      existencia: isNaN(existencia)?0:existencia,
+      pasillo:null, bodega:null, real:null, diferencia:null
+    });
+  }
+  return productos;
+}
+
+function renderMensual(panel){
+  const st = state.mensual;
+  if(st.step===1) ZStep1(panel, st);
+  if(st.step===2) ZStep2(panel, st);
+  if(st.step===3) ZStep3(panel, st);
+}
+
+function ZStep1(panel, st){
+  panel.innerHTML = `
+    <div class="step-title"><h2>1. Cargar reporte de existencias</h2></div>
+    <p class="lead tag">En Microsip: Existencia y Valor del Inventario para el inventario mensual que estás contando.</p>
+    <div class="grid2">
+      <div>
+        <label class="f">¿Cuál inventario es?</label>
+        <select id="zSelInventario">
+          <option value="SAMS">SAM'S</option>
+          <option value="USA">USA</option>
+          <option value="WALMART">WALMART</option>
+          <option value="OTRO">Otro...</option>
+        </select>
+      </div>
+      <div id="zOtroWrap" style="display:none;">
+        <label class="f">Nombre del inventario</label>
+        <input type="text" id="zOtroNombre" placeholder="Ej. COSTCO">
+      </div>
+    </div>
+    <div class="callout" style="margin-top:14px;">Sube aquí ese reporte (.xlsx / .xls).</div>
+    <input type="file" id="zFileInput" accept=".xlsx,.xls,.xlsm">
+    <div id="zParseArea"></div>
+  `;
+  const sel = document.getElementById('zSelInventario');
+  const otroWrap = document.getElementById('zOtroWrap');
+  const otroInput = document.getElementById('zOtroNombre');
+  const conocidos = ['SAMS','USA','WALMART'];
+  sel.value = conocidos.includes(st.nombreInventario) ? st.nombreInventario : 'OTRO';
+  if(sel.value==='OTRO'){ otroWrap.style.display='block'; otroInput.value = st.nombreInventario; }
+  sel.addEventListener('change', ()=>{
+    if(sel.value==='OTRO'){ otroWrap.style.display='block'; st.nombreInventario = otroInput.value.trim() || 'OTRO'; }
+    else { otroWrap.style.display='none'; st.nombreInventario = sel.value; }
+  });
+  otroInput.addEventListener('input', ()=>{ st.nombreInventario = otroInput.value.trim() || 'OTRO'; });
+
+  document.getElementById('zFileInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    readWorkbookRows(file, (rows)=>{
+      st.productos = ZparseReporte(rows);
+      st.maxStepReached = Math.max(st.maxStepReached, 3);
+      ZrenderParseSummary(st);
+    });
+  });
+  if(st.productos.length) ZrenderParseSummary(st);
+}
+
+function ZrenderParseSummary(st){
+  const area = document.getElementById('zParseArea');
+  if(!area) return;
+  area.innerHTML = `
+    <div class="stats-row"><div class="stat"><div class="n">${st.productos.length}</div><div class="l">artículos en el reporte</div></div></div>
+    <button class="btn" id="zBtnToStep2">Continuar a captura →</button>
+  `;
+  document.getElementById('zBtnToStep2').onclick = ()=>{ st.step=2; render(); };
+}
+
+function ZStep2(panel, st){
+  if(!st.productos.length){ panel.innerHTML = `<div class="callout bad">Primero carga el reporte en el paso 1.</div>`; return; }
+  panel.innerHTML = `
+    <div class="step-title"><h2>2. Captura de existencia real — ${st.nombreInventario}</h2></div>
+    <p class="lead tag">Diferencia = Real − Existencia (teórico). Positivo → Entrada. Negativo → Salida. Si no lo encuentras, captura 0.</p>
+    <div class="toolbar">
+      <button class="btn secondary small" id="zBtnModeStepper">Uno por uno</button>
+      <button class="btn secondary small" id="zBtnModeTabla">Vista de tabla</button>
+      <div class="spacer"></div>
+      <input type="text" id="zBuscador" placeholder="Buscar producto..." style="min-width:180px;">
+      <button class="btn small" id="zBtnFinalizarYa">Finalizar aquí y generar archivos →</button>
+    </div>
+    <div id="zCaptureBody"></div>
+  `;
+  document.getElementById('zBtnFinalizarYa').onclick = ()=>{ st.step=3; render(); };
+  document.getElementById('zBtnModeStepper').onclick = ()=>{ st.captureMode='stepper'; ZrenderCaptureBody(st); };
+  document.getElementById('zBtnModeTabla').onclick = ()=>{ st.captureMode='tabla'; ZrenderCaptureBody(st); };
+  document.getElementById('zBuscador').addEventListener('input', (e)=>{
+    const q = e.target.value.trim().toUpperCase();
+    if(!q) return;
+    if(st.captureMode==='stepper'){
+      const idx = st.productos.findIndex(r=>r.nombre.toUpperCase().includes(q));
+      if(idx>=0){ st.captureIndex = idx; ZrenderCaptureBody(st); }
+    } else { ZrenderCaptureBody(st, q); }
+  });
+  ZrenderCaptureBody(st);
+}
+
+function ZcomputeReal(r){
+  if(r.pasillo===null && r.bodega===null){ r.real = null; }
+  else { r.real = Math.round(((r.pasillo||0) + (r.bodega||0))*10000000000)/10000000000; }
+}
+function ZsetCampo(st, idx, campo, val){
+  const r = st.productos[idx];
+  const v = parseNum(val);
+  r[campo] = (val==='' || val===null || isNaN(v)) ? null : v;
+  ZcomputeReal(r);
+  r.diferencia = r.real===null ? null : Math.round((r.real - r.existencia)*10000000000)/10000000000;
+}
+
+function ZrenderCaptureBody(st, filterQ){
+  const body = document.getElementById('zCaptureBody');
+  if(!body) return;
+  const capturados = st.productos.filter(r=>r.real!==null).length;
+  const total = st.productos.length;
+
+  if(st.captureMode==='tabla'){
+    let rows = st.productos;
+    if(filterQ) rows = rows.filter(r=>r.nombre.toUpperCase().includes(filterQ));
+    let lineaAnterior = null;
+    const filas = [];
+    rows.forEach(r=>{
+      if(r.linea !== lineaAnterior){
+        filas.push(`<tr><td colspan="6" style="background:var(--green-pale); color:var(--green-deep); font-weight:700; padding:6px 10px;">${r.linea || 'Sin línea'}</td></tr>`);
+        lineaAnterior = r.linea;
+      }
+      const gi = st.productos.indexOf(r);
+      filas.push(`<tr>
+        <td>${r.nombre}</td><td>${r.clave}</td>
+        <td class="num-cell">${fmtNum(r.existencia)}</td>
+        <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="pasillo" class="zCampoInput" style="width:64px;" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></td>
+        <td class="num-cell"><input type="text" data-idx="${gi}" data-campo="bodega" class="zCampoInput" style="width:64px;" value="${r.bodega===null?'':fmtNum(r.bodega)}"></td>
+        <td class="num-cell">${r.diferencia===null?'':fmtNum(r.diferencia)}</td>
+      </tr>`);
+    });
+    body.innerHTML = `
+      <div class="progress-bar"><div class="fill" style="width:${(capturados/total*100).toFixed(0)}%"></div></div>
+      <div class="scroll"><table>
+        <thead><tr><th>Producto</th><th>Clave</th><th class="num-cell">Teórico</th><th class="num-cell">Pasillo</th><th class="num-cell">Bodega</th><th class="num-cell">Dif.</th></tr></thead>
+        <tbody>${filas.join('')}</tbody>
+      </table></div>
+    `;
+    body.querySelectorAll('.zCampoInput').forEach((inp, pos)=>{
+      inp.addEventListener('change', (e)=>{ ZsetCampo(st, parseInt(e.target.dataset.idx,10), e.target.dataset.campo, e.target.value); ZrenderCaptureBody(st, filterQ); });
+      inp.addEventListener('keydown', (e)=>{
+        if(e.key==='Tab'){
+          e.preventDefault();
+          ZsetCampo(st, parseInt(inp.dataset.idx,10), inp.dataset.campo, inp.value);
+          ZrenderCaptureBody(st, filterQ);
+          const nuevos = document.querySelectorAll('.zCampoInput');
+          const destino = e.shiftKey ? nuevos[pos-1] : nuevos[pos+1];
+          if(destino){ destino.focus(); destino.select(); }
+        }
+      });
+    });
+    return;
+  }
+
+  const i = st.captureIndex;
+  const r = st.productos[i];
+  const diffPreview = r.real===null ? null : Math.round((r.real - r.existencia)*10000000000)/10000000000;
+  body.innerHTML = `
+    <div class="progress-bar"><div class="fill" style="width:${((i+1)/total*100).toFixed(0)}%"></div></div>
+    <div class="capture">
+      <div style="text-align:center;">
+        <span class="clave-tag">CLAVE ${r.clave}</span>
+        <div class="nombre">${r.nombre}</div>
+        <div class="sistema">${r.linea?r.linea+' · ':''}Teórico: ${fmtNum(r.existencia)} ${r.unidad||''} · Producto ${i+1} de ${total}</div>
+      </div>
+      <div>
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;"><label class="f" style="text-align:center;">Pasillo</label><input type="text" inputmode="decimal" class="real" id="zPasilloBox" placeholder="0" value="${r.pasillo===null?'':fmtNum(r.pasillo)}"></div>
+          <div style="flex:1;"><label class="f" style="text-align:center;">Bodega</label><input type="text" inputmode="decimal" class="real" id="zBodegaBox" placeholder="0" value="${r.bodega===null?'':fmtNum(r.bodega)}"></div>
+        </div>
+        <div class="resta ${diffPreview>0?'neg':diffPreview<0?'pos':''}" id="zDiffPreview">${diffPreview===null?'&nbsp;':(diffPreview>0?'ENTRADA: ':diffPreview<0?'SALIDA: ':'SIN DIFERENCIA')+(diffPreview!==0?fmtNum(Math.abs(diffPreview)):'')}</div>
+      </div>
+      <div class="navrow">
+        <button class="btn secondary" id="zBtnAnterior" ${i===0?'disabled':''}>← Anterior</button>
+        <button class="btn" id="zBtnSiguiente">${i===total-1?'Finalizar':'Siguiente →'}</button>
+      </div>
+    </div>
+  `;
+  const pasilloBox = document.getElementById('zPasilloBox');
+  const bodegaBox = document.getElementById('zBodegaBox');
+  const preview = document.getElementById('zDiffPreview');
+  pasilloBox.focus(); pasilloBox.select();
+  function livePreview(){
+    const p = parseNum(pasilloBox.value); const b = parseNum(bodegaBox.value);
+    if(isNaN(p) && isNaN(b)){ preview.innerHTML = '&nbsp;'; preview.className='resta'; return; }
+    const real = (isNaN(p)?0:p) + (isNaN(b)?0:b);
+    const diff = Math.round((real - r.existencia)*10000000000)/10000000000;
+    preview.textContent = (diff>0?'ENTRADA: ':diff<0?'SALIDA: ':'SIN DIFERENCIA')+(diff!==0?fmtNum(Math.abs(diff)):'');
+    preview.className = 'resta ' + (diff>0?'neg':diff<0?'pos':'');
+  }
+  pasilloBox.addEventListener('input', livePreview);
+  bodegaBox.addEventListener('input', livePreview);
+  pasilloBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); ZsetCampo(st, i, 'pasillo', pasilloBox.value); bodegaBox.focus(); bodegaBox.select(); } });
+  bodegaBox.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); goNext(); } });
+  document.getElementById('zBtnSiguiente').onclick = goNext;
+  document.getElementById('zBtnAnterior').onclick = ()=>{ guardarAmbos(); if(i>0){ st.captureIndex--; ZrenderCaptureBody(st); } };
+  function guardarAmbos(){
+    ZsetCampo(st, i, 'pasillo', pasilloBox.value);
+    ZsetCampo(st, i, 'bodega', bodegaBox.value);
+  }
+  function goNext(){
+    guardarAmbos();
+    if(i < total-1){ st.captureIndex++; ZrenderCaptureBody(st); }
+    else { ZfinishBanner(st); }
+  }
+}
+
+function ZfinishBanner(st){
+  const body = document.getElementById('zCaptureBody');
+  const pendientes = st.productos.filter(r=>r.real===null).length;
+  body.innerHTML = `
+    <div class="callout ${pendientes?'warn':''}">${pendientes ? `Quedan <b>${pendientes}</b> productos sin capturar — no se incluirán en los archivos.` : 'Terminaste de capturar todos los productos.'}</div>
+    <button class="btn secondary" id="zBtnRevisar">Revisar en tabla</button>
+    <button class="btn" id="zBtnAGenerar">Ir a generar archivos →</button>
+  `;
+  document.getElementById('zBtnRevisar').onclick = ()=>{ st.captureMode='tabla'; ZrenderCaptureBody(st); };
+  document.getElementById('zBtnAGenerar').onclick = ()=>{ st.step=3; render(); };
+}
+
+function ZStep3(panel, st){
+  const capturados = st.productos.filter(r=>r.real!==null);
+  const pendientes = st.productos.length - capturados.length;
+  const entradas = capturados.filter(r=>r.diferencia > 0.0000000001);
+  const salidas = capturados.filter(r=>r.diferencia < -0.0000000001);
+  const nombre = (st.nombreInventario||'INVENTARIO').replace(/\s+/g,'_');
+  panel.innerHTML = `
+    <div class="step-title"><h2>3. Generar archivos para Microsip</h2></div>
+    <p class="lead tag">${st.nombreInventario} — Diferencia = Real − Teórico. Positivo → Entrada. Negativo → Salida.</p>
+    ${pendientes ? `<div class="callout warn">${pendientes} productos sin capturar quedaron fuera de estos archivos.</div>` : ''}
+    <div class="stats-row">
+      <div class="stat"><div class="n">${entradas.length}</div><div class="l">para Entradas</div></div>
+      <div class="stat"><div class="n">${salidas.length}</div><div class="l">para Salidas</div></div>
+    </div>
+    <div class="grid2">
+      <div>
+        <button class="btn" id="zBtnDescargarEntradas" ${!entradas.length?'disabled':''}>Descargar Entrada_${nombre}_${fechaHoy()}.xlsx</button>
+        <div class="scroll" style="margin-top:8px; max-height:220px;"><table><thead><tr><th>Clave</th><th>Producto</th><th class="num-cell">Cant.</th></tr></thead>
+        <tbody>${entradas.map(r=>`<tr><td>${r.clave}</td><td>${r.nombre}</td><td class="num-cell">${fmtNum(r.diferencia)}</td></tr>`).join('')}</tbody></table></div>
+      </div>
+      <div>
+        <button class="btn" id="zBtnDescargarSalidas" ${!salidas.length?'disabled':''}>Descargar Salida_${nombre}_${fechaHoy()}.xlsx</button>
+        <div class="scroll" style="margin-top:8px; max-height:220px;"><table><thead><tr><th>Clave</th><th>Producto</th><th class="num-cell">Cant.</th></tr></thead>
+        <tbody>${salidas.map(r=>`<tr><td>${r.clave}</td><td>${r.nombre}</td><td class="num-cell">${fmtNum(Math.abs(r.diferencia))}</td></tr>`).join('')}</tbody></table></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('zBtnDescargarEntradas').onclick = ()=>Zdescargar(entradas, 'Entrada_'+nombre+'_'+fechaHoy()+'.xlsx', r=>r.diferencia);
+  document.getElementById('zBtnDescargarSalidas').onclick = ()=>Zdescargar(salidas, 'Salida_'+nombre+'_'+fechaHoy()+'.xlsx', r=>Math.abs(r.diferencia));
+}
+function Zdescargar(rows, filename, cantFn){
+  const aoa = [[]];
+  rows.forEach(r=> aoa.push([r.clave, cantFn(r)]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, filename);
+}
+
+render();
+</script>
+</body>
+</html>
