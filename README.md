@@ -1,100 +1,76 @@
-# inventarios-toolkit
+# Inventarios Toolkit
 
-> Standalone web app that digitizes recurring warehouse inventory processes and generates ready-to-import files for **Microsip ERP**.
-> Single HTML file · No backend · No installation · Runs entirely in the browser.
+Herramienta interna para digitalizar los conteos y ajustes de inventario de un CEDIS que trabaja con **Microsip**. Reemplaza varias macros de Excel (VBA) con una sola página web que corre en el navegador y genera los archivos de importación a Microsip.
 
-🇲🇽 [Versión en español más abajo](#-versión-en-español)
+> Es una herramienta interna, **no un SaaS**: no tiene backend, no usa servidor propio y no guarda datos.
 
----
+## Qué incluye
 
-## The problem
+Un solo archivo HTML con un menú lateral y siete herramientas:
 
-In a distribution center (CEDIS), several inventory processes (weekly produce counts, negative-stock corrections, damaged/expired goods, monthly audits) were handled with **Excel macros (VBA)**: one file per process, hard to maintain, and hard for new employees to pick up.
+- **Verdura · Ajuste mensual**
+  - Sube el reporte de existencias de Microsip.
+  - Busca cada verdura por nombre o código (también con pistola de código de barras).
+  - Captura el peso real y calcula **Sistema − Peso**: si falta es Salida, si sobra es Entrada.
+  - Genera los archivos de Salidas y Entradas solo con lo que se pesó.
+  - Conserva los modos "Uno por uno" y "Vista de tabla" como respaldo.
+- **Análisis de Verdura**
+  - Sube la relación de inventario de mermas (uno o varios archivos, se suman).
+  - Muestra el Top 5, 10 o 15 de verduras por costo de pérdida, con las unidades perdidas al lado.
+  - Incluye fila de VARIOS, TOTAL y gráfica Pareto (costo y % acumulado).
+  - Permite quitar artículos como **excepciones** (ajuste atrasado o justificable): la lista se recorre y los totales se recalculan.
+  - Descarga un Excel con el Top, el detalle y las excepciones.
+- **Miércoles · Rectificación**
+  - Recuenta solo los artículos con Salidas mayores a 6.
+  - Clasifica cada producto como MERMA, Ajuste ENTRADA o NO impacta.
+  - Calcula el costo de la merma y genera el archivo de Entrada.
+- **Negativos**
+  - Carga el reporte de artículos con existencia negativa.
+  - Captura la existencia real (pasillo y bodega) y genera el archivo de Entradas.
+- **Mermas de Tarima**
+  - Registra con pistola de código de barras los artículos dañados o caducados en tablas separadas.
+  - Descarga cada tabla en su formato.
+- **Análisis de Mermas**
+  - Sube los reportes mensuales de Merma Caducidad y Merma Daño.
+  - Genera el análisis Top 5/10 + Varios con gráfica Pareto.
+- **Inventario Mensual**
+  - Sirve para inventarios externos (SAM'S, USA, Walmart u otros).
+  - Compara Real contra Teórico y genera Entrada o Salida según el signo de la diferencia.
 
-Each process follows the same pattern: load an ERP report → capture the physical count → compare against the system → generate an Entrada/Salida file for the ERP.
+## Cómo usarlo
 
-## The solution
+- Descarga el archivo HTML del repositorio.
+- Ábrelo con doble clic en tu navegador (Chrome, Edge o Firefox).
+- Elige un proceso en el menú lateral y sigue los pasos.
+- Descarga los archivos generados e impórtalos a Microsip como siempre. **La importación sigue siendo manual.**
 
-One HTML file with a sidebar to switch between processes. All of them share the same engine:
+## Cosas a tener en cuenta
 
-1. **Load** the report exported from Microsip (.xlsx)
-2. **Capture** the real physical count
-3. **Calculate** differences (System − Real)
-4. **Generate** the import file (Entrada / Salida) in the exact format the ERP expects
+- **Necesita internet al abrirse** para cargar las librerías [SheetJS](https://sheetjs.com/) (leer y escribir Excel) y [Chart.js](https://www.chartjs.org/) (gráficas) desde cdnjs, y la tipografía Inter desde Google Fonts.
+- **Los datos no salen de tu computadora.** Todo se procesa en el navegador; nada se sube a un servidor.
+- **No guarda la captura.** Si cierras o recargas la pestaña se pierde lo capturado (el navegador avisa antes de cerrar). Descarga los archivos antes de salir.
+- **Formato de los archivos para Microsip:** fila 1 vacía, clave del artículo en la columna A y cantidad en la columna B.
+- **No subas reportes reales** (existencias, mermas, costos) a este repositorio: es público y esos datos son de la empresa.
 
-## Processes
+## Tecnología
 
-| Process | What it does |
-|---|---|
-| **Lunes · Verdura** | Weekly produce count. Cross-checks the Microsip stock report against a catalog of ~165 products and generates Entrada/Salida files. |
-| **Miércoles · Rectificación** | Re-counts only items with high outflows. Classifies each product as *Merma* / *Ajuste Entrada* / *No impacta* and calculates shrinkage cost. |
-| **Negativos** | Fixes items with negative stock in the system by capturing real stock and generating an Entrada file. |
-| **Mermas de Tarima** | Fast logging of damaged and expired goods using a barcode scanner, in separate Daño / Caducidad tables. |
-| **Análisis de Mermas** | Monthly shrinkage report: Top 5/10 + "Varios", with a Pareto chart (cost + cumulative %). |
-| **Inventario Mensual** | Generic external-inventory process (e.g. SAM'S, USA, Walmart). Compares Real vs. Theoretical and generates Entrada or Salida depending on the sign of the difference. |
+- HTML, CSS y JavaScript sin framework, en un solo archivo.
+- [SheetJS](https://sheetjs.com/) 0.18.5 para leer y generar `.xlsx`.
+- [Chart.js](https://www.chartjs.org/) 4.4.4 para las gráficas Pareto.
+- Diseño propio: verde bosque `#1B4332` y naranja `#F2994A` (colores del logo), tipografía Inter, animaciones solo con CSS y Web Animations API que respetan la opción "reducir movimiento" del sistema.
 
-## Tech stack
+## Historial de versiones
 
-- Vanilla **JavaScript**, HTML and CSS (single file)
-- [SheetJS (xlsx)](https://sheetjs.com/) for reading and writing Excel files
-- [Chart.js](https://www.chartjs.org/) for the Pareto charts
-- UI inspired by SAP Fiori (Inter typeface, dense layout, sidebar navigation)
-
-## How to use
-
-1. Download `INVENTARIOS.html`
-2. Open it in any modern browser (Chrome, Edge, Firefox, Brave)
-3. Pick a process from the sidebar and follow the steps
-
-> Internet is needed only to load the two libraries from a CDN. Data is processed locally and never leaves your computer.
-
-## Design decisions
-
-- **Single file, no server:** easy to share and to run on any workstation.
-- **Business rules built in:** for example, in the Wednesday process, if Real < Salidas the difference is treated as *merma* (with cost) even though the ERP adjustment is an Entrada.
-- **Built to be handed over:** the goal is that warehouse staff can operate it without technical support.
-
-## Screenshots
-
-_Add screenshots here (Home, a capture screen, the Pareto chart)._
-
-## Changelog
-
-- **v1.1** – Fix: product code for PLATANO OFERTA now keeps leading zeros (`00230`) to match Microsip.
-- **v1.0** – Initial version.
-
-## Author
-
-**Ricardo Gómez** – Industrial Maintenance Engineer · Data Analyst / Inventory Specialist
-[GitHub](https://github.com/rickardogomez99-sys)
-
----
-
-## 🇲🇽 Versión en español
-
-**inventarios-toolkit** es una herramienta web independiente que digitaliza los procesos recurrentes de inventario de un CEDIS y genera los archivos de importación para **Microsip ERP**. Es un solo archivo HTML, sin servidor ni instalación.
-
-### El problema
-
-Los procesos de inventario (conteo semanal de verdura, corrección de negativos, mermas, inventarios mensuales) se manejaban con **macros de Excel (VBA)**: un archivo por proceso, difícil de mantener y de enseñar a nuevo personal.
-
-### La solución
-
-Un solo archivo con un menú lateral para elegir el proceso. Todos comparten el mismo flujo: **cargar reporte → capturar conteo real → calcular diferencias → generar archivo de Entrada/Salida** para Microsip.
-
-### Procesos incluidos
-
-- **Lunes · Verdura:** conteo semanal contra catálogo de ~165 productos.
-- **Miércoles · Rectificación:** recuento de artículos con salidas altas; clasifica merma y calcula costo.
-- **Negativos:** corrige artículos con existencia negativa.
-- **Mermas de Tarima:** captura de daño y caducidad con pistola de código de barras.
-- **Análisis de Mermas:** reporte mensual Top 5/10 con gráfica Pareto.
-- **Inventario Mensual:** inventarios externos (SAM'S, USA, Walmart u otros).
-
-### Cómo usarla
-
-1. Descarga `INVENTARIOS.html`
-2. Ábrelo en tu navegador
-3. Elige un proceso en el menú lateral y sigue los pasos
-
-Los datos se procesan localmente en el navegador; no se envían a ningún servidor.
+- **v1.3**
+  - Verdura pasa a ser **Ajuste mensual** con el nuevo modo **Buscar y pesar**.
+  - Se corrigió el desborde en pantallas de celular.
+- **v1.2**
+  - Diseño nuevo con animaciones (solo visual, sin cambios de lógica).
+- **v1.1**
+  - Nueva sección **Análisis de Verdura** con excepciones.
+  - Botón para terminar antes la captura de Verdura.
+  - Arreglos: el scroll ya no salta al inicio al capturar en tablas, el buscador restaura la lista al borrar el texto y una baja con existencia 0 ya no genera una Salida vacía.
+  - Aviso del navegador antes de cerrar con captura sin descargar.
+  - Icono propio en la pestaña del navegador.
+- **v1.0**
+  - Versión base con los procesos originales.
